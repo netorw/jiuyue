@@ -9,11 +9,20 @@
         :root { --primary-color: #4a90e2; --bg-color: #f8f9fa; --card-bg: #ffffff; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
         .container { max-width: 900px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 30px; }
-        h1 { color: var(--primary-color); margin-bottom: 5px; }
-        .quote { font-style: italic; color: #666; margin-top: 0; font-size: 16px; }
-        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
+        /* 标题深度优化：更大、更稳、不留孤字 */
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { 
+            color: var(--primary-color); 
+            margin-bottom: 10px; 
+            font-size: clamp(26px, 8vw, 42px); /* 调大底线和上限 */
+            font-weight: 800; /* 加粗，更有分量 */
+            text-wrap: balance; /* 核心黑科技：自动平衡换行字数，防止末尾剩一个字 */
+            line-height: 1.2;
+        }
+        .quote { font-style: italic; color: #666; margin-top: 0; font-size: 16px; }
+
+        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .analysis-card { background: #eef5ff; border-left: 5px solid var(--primary-color); border-radius: 8px; padding: 15px 20px; margin-bottom: 20px; }
         .analysis-card h3 { margin-top: 0; color: #2c5282; font-size: 18px; }
         .analysis-card ul { margin: 0; padding-left: 20px; }
@@ -23,6 +32,7 @@
         .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
         button { padding: 8px 14px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); border-radius: 20px; cursor: pointer; transition: 0.3s; font-size: 14px; }
         button.active { background: var(--primary-color); color: white; }
+        
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
         th, td { padding: 10px 4px; border-bottom: 1px solid #eee; text-align: center; }
         th { background-color: #f8f9fa; }
@@ -86,6 +96,7 @@
 </div>
 
 <script>
+    // 再次手动校对 12 次完整数据
     const rawData = [
         {"time": "24.10", "总分": [510, 413], "语文": [90, 572], "数学": [111, 408], "英语": [109, 442], "物理": [52, 793], "化学": [73, 557], "地理": [75, 170]},
         {"time": "24.11", "总分": [447, 242], "语文": [91, 111], "数学": [81, 335], "英语": [86, 488], "物理": [65, 176], "化学": [60, 447], "地理": [64, 473]},
@@ -98,7 +109,7 @@
         {"time": "25.12.12", "总分": [508, 179], "语文": [106, 178], "数学": [77, 616], "英语": [140, 6], "物理": [68, 101], "化学": [53, 410], "地理": [64, 53]},
         {"time": "25.12.24", "总分": [499, 103], "语文": [103.5, null], "数学": [107, null], "英语": [124.5, null], "物理": [64, null], "化学": [36, null], "地理": [64, null]},
         {"time": "26.01", "总分": [528, 281], "语文": [99, 881], "数学": [120, 221], "英语": [117, 202], "物理": [70, 272], "化学": [53, 768], "地理": [69, 58]},
-        {"time": "26.04.16", "总分": [565, 138], "语文": [111, 406], "数学": [107, 235], "英语": [122, 112], "物理": [76, 148], "化学": [71, 437], "地理": [78, 11]}
+        {"time": "26.04.16", "总分": [565, 138], "语文": [111, 406], "数学": [107, 235], "外语": [122, 112], "物理": [76, 148], "化学": [71, 437], "地理": [78, 11]}
     ];
 
     const ctx = document.getElementById('scoreChart').getContext('2d');
@@ -110,7 +121,7 @@
             data: {
                 labels: rawData.map(d => d.time),
                 datasets: [{
-                    label: '排名',
+                    label: '总分排名',
                     data: rawData.map(d => d.总分[1]),
                     borderColor: '#4a90e2',
                     backgroundColor: 'rgba(74, 144, 226, 0.1)',
@@ -125,7 +136,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { reverse: true, title: { display: true, text: '年级排名' } }
+                    y: { reverse: true, title: { display: true, text: '全校排名' } }
                 },
                 plugins: {
                     tooltip: {
@@ -133,7 +144,9 @@
                             label: (context) => {
                                 let item = rawData[context.dataIndex];
                                 let sub = document.querySelector('button.active').innerText;
-                                return `分数: ${item[sub][0]} | 排名: ${item[sub][1] || '无排名'}`;
+                                // 兼容 26.04 的外语字段
+                                let targetSub = sub === '英语' && !item['英语'] ? '外语' : sub;
+                                return `分数: ${item[targetSub][0]} | 排名: ${item[targetSub][1] || '无排名'}`;
                             }
                         }
                     }
@@ -152,7 +165,14 @@
     function updateChart(subject) {
         document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
-        myChart.data.datasets[0].data = rawData.map(d => d[subject][1]);
+        
+        const chartData = rawData.map(d => {
+            // 特殊处理 26.04 的外语
+            let key = subject === '英语' && !d['英语'] ? '外语' : subject;
+            return d[key] ? d[key][1] : null;
+        });
+
+        myChart.data.datasets[0].data = chartData;
         myChart.data.datasets[0].label = subject + ' 排名';
         myChart.update();
     }
@@ -160,13 +180,14 @@
     function fillTable() {
         const tbody = document.getElementById('tableBody');
         rawData.forEach(d => {
-            // 修正后的表格逻辑：分数在上(加粗)，排名在下(小字)
+            // 处理英语/外语字段
+            const eng = d.英语 || d.外语;
             tbody.innerHTML += `<tr>
                 <td>${d.time}</td>
                 <td><b>${d.总分[0]}</b><br><small>${d.总分[1] || '-'}</small></td>
                 <td>${d.语文[0]}<br><small>${d.语文[1] || '-'}</small></td>
                 <td>${d.数学[0]}<br><small>${d.数学[1] || '-'}</small></td>
-                <td>${d.英语[0]}<br><small>${d.英语[1] || '-'}</small></td>
+                <td>${eng[0]}<br><small>${eng[1] || '-'}</small></td>
                 <td>${d.物理[0] || '-'}<br><small>${d.物理[1] || '-'}</small></td>
                 <td>${d.化学[0]}<br><small>${d.化学[1] || '-'}</small></td>
                 <td>${d.地理[0]}<br><small>${d.地理[1] || '-'}</small></td>

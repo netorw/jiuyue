@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王子九悦 · 成绩成长博物馆</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary-color: #4a90e2; --bg-color: #f8f9fa; --card-bg: #ffffff; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { color: var(--primary-color); margin-bottom: 5px; }
+        .quote { font-style: italic; color: #666; margin-top: 0; font-size: 16px; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        .analysis-card { background: #eef5ff; border-left: 5px solid var(--primary-color); border-radius: 8px; padding: 15px 20px; margin-bottom: 20px; }
+        .analysis-card h3 { margin-top: 0; color: #2c5282; font-size: 18px; }
+        .analysis-card ul { margin: 0; padding-left: 20px; }
+        .analysis-card li { margin-bottom: 10px; line-height: 1.5; font-size: 14px; color: #4a5568; }
+
+        .chart-container { position: relative; height: 350px; width: 100%; }
+        .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
+        button { padding: 8px 14px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); border-radius: 20px; cursor: pointer; transition: 0.3s; font-size: 14px; }
+        button.active { background: var(--primary-color); color: white; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        th, td { padding: 10px 4px; border-bottom: 1px solid #eee; text-align: center; }
+        th { background-color: #f8f9fa; }
+        @media (max-width: 600px) { .chart-container { height: 280px; } th, td { font-size: 11px; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🌟 王子九悦的学习轨迹</h1>
+        <p class="quote">“越过重重山岗，终将遇见星辰。”</p>
+    </header>
+
+    <div class="card">
+        <h3>📈 排名趋势 (向上代表进步)</h3>
+        <div class="controls" id="btnGroup">
+            <button class="active" onclick="updateChart('总分')">总分</button>
+            <button onclick="updateChart('语文')">语文</button>
+            <button onclick="updateChart('数学')">数学</button>
+            <button onclick="updateChart('英语')">英语</button>
+            <button onclick="updateChart('物理')">物理</button>
+            <button onclick="updateChart('化学')">化学</button>
+            <button onclick="updateChart('地理')">地理</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="scoreChart"></canvas>
+        </div>
+    </div>
+
+    <div class="analysis-card">
+        <h3>💡 学情深度洞察</h3>
+        <ul>
+            <li><strong>整体势头：</strong>高一至今，校排名呈现明显的“波动中爬升”态势。即便遇到阶段性挑战，也能在下一次考试中强势反弹，展现出极强的抗压能力。</li>
+            <li><strong>王牌领航：</strong>英语（校排第6）与地理（校排第11）已构成坚实的“护城河”。这两科不仅是得分核心，更是冲击顶尖名次的底气。</li>
+            <li><strong>韧劲逆袭：</strong>物理与数学排名持续大幅进步，物理从最初的 700+ 名杀回前 150 名，说明逻辑思维训练已见成效，理科潜力巨大。</li>
+            <li><strong>关键突破点：</strong>目前进入全校前 100 名的最后一块拼图是“语文的稳定性”。若能锁定波动原因并补齐短板，整体位次将迎来质的飞跃。</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>📊 成绩档案明细 (原始分/校排名)</h3>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>总分/排名</th>
+                        <th>语文</th>
+                        <th>数学</th>
+                        <th>英语</th>
+                        <th>物理</th>
+                        <th>化学</th>
+                        <th>地理</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rawData = [
+        {"time": "24.10", "总分": [510, 413], "语文": [90, 572], "数学": [111, 408], "英语": [109, 442], "物理": [52, 793], "化学": [73, 557], "地理": [75, 170]},
+        {"time": "24.11", "总分": [447, 242], "语文": [91, 111], "数学": [81, 335], "英语": [86, 488], "物理": [65, 176], "化学": [60, 447], "地理": [64, 473]},
+        {"time": "24.12.4", "总分": [456, 356], "语文": [97, null], "数学": [65, null], "英语": [124, null], "物理": [45, null], "化学": [59, null], "地理": [66, null]},
+        {"time": "25.01.18", "总分": [552, 193], "语文": [109, 264], "数学": [98, 441], "英语": [119, 111], "物理": [81, 294], "化学": [71, 205], "地理": [74, 213]},
+        {"time": "25.03.21", "总分": [528, 230], "语文": [119, 4], "数学": [117, 162], "英语": [120, 106], "物理": [60, 483], "化学": [60, 487], "地理": [52, 188]},
+        {"time": "25.05.09", "总分": [556, 192], "语文": [110, 156], "数学": [123, 494], "英语": [130, 34], "物理": [62, 276], "化学": [79, 175], "地理": [52, 243]},
+        {"time": "25.07.09", "总分": [534, 185], "语文": [108, 113], "数学": [110, 376], "英语": [125, 83], "物理": [59, 239], "化学": [74, 268], "地理": [58, 97]},
+        {"time": "25.10.16", "总分": [516, 119], "语文": [101, 427], "数学": [88, 312], "英语": [131, 85], "物理": [55, 186], "化学": [70, 146], "地理": [71, 35]},
+        {"time": "25.12.12", "总分": [508, 179], "语文": [106, 178], "数学": [77, 616], "英语": [140, 6], "物理": [68, 101], "化学": [53, 410], "地理": [64, 53]},
+        {"time": "25.12.24", "总分": [499, 103], "语文": [103.5, null], "数学": [107, null], "英语": [124.5, null], "物理": [64, null], "化学": [36, null], "地理": [64, null]},
+        {"time": "26.01", "总分": [528, 281], "语文": [99, 881], "数学": [120, 221], "英语": [117, 202], "物理": [70, 272], "化学": [53, 768], "地理": [69, 58]},
+        {"time": "26.04.16", "总分": [565, 138], "语文": [111, 406], "数学": [107, 235], "英语": [122, 112], "物理": [76, 148], "化学": [71, 437], "地理": [78, 11]}
+    ];
+
+    const ctx = document.getElementById('scoreChart').getContext('2d');
+    let myChart;
+
+    function initChart() {
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: rawData.map(d => d.time),
+                datasets: [{
+                    label: '排名',
+                    data: rawData.map(d => d.总分[1]),
+                    borderColor: '#4a90e2',
+                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    spanGaps: true,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { reverse: true, title: { display: true, text: '年级排名' } }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                let item = rawData[context.dataIndex];
+                                let sub = document.querySelector('button.active').innerText;
+                                return `分数: ${item[sub][0]} | 排名: ${item[sub][1] || '无排名'}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && myChart) {
+            myChart.resize();
+            myChart.update();
+        }
+    });
+
+    function updateChart(subject) {
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        myChart.data.datasets[0].data = rawData.map(d => d[subject][1]);
+        myChart.data.datasets[0].label = subject + ' 排名';
+        myChart.update();
+    }
+
+    function fillTable() {
+        const tbody = document.getElementById('tableBody');
+        rawData.forEach(d => {
+            // 修正后的表格逻辑：分数在上(加粗)，排名在下(小字)
+            tbody.innerHTML += `<tr>
+                <td>${d.time}</td>
+                <td><b>${d.总分[0]}</b><br><small>${d.总分[1] || '-'}</small></td>
+                <td>${d.语文[0]}<br><small>${d.语文[1] || '-'}</small></td>
+                <td>${d.数学[0]}<br><small>${d.数学[1] || '-'}</small></td>
+                <td>${d.英语[0]}<br><small>${d.英语[1] || '-'}</small></td>
+                <td>${d.物理[0] || '-'}<br><small>${d.物理[1] || '-'}</small></td>
+                <td>${d.化学[0]}<br><small>${d.化学[1] || '-'}</small></td>
+                <td>${d.地理[0]}<br><small>${d.地理[1] || '-'}</small></td>
+            </tr>`;
+        });
+    }
+
+    window.onload = () => { initChart(); fillTable(); };
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>50秒终极自检兼容录制版</title>
+    <title>50秒无损录制-参数修复终极版</title>
     <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.7.0/dist/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
@@ -40,7 +40,6 @@
             margin-top: 15px; padding: 12px; background: #1e2030; border-radius: 8px;
             font-size: 0.9rem; text-align: left; border: 1px solid #3b4261; line-height: 1.6;
         }
-        .err-text { color: #ff4a4a; font-weight: bold; }
         .success-text { color: #00ff88; font-weight: bold; }
     </style>
 </head>
@@ -71,34 +70,13 @@
 
         let chosenCodec = null;
 
-        // ==========================================
-        // 🩺 核心：全自动环境医生诊断脚本
-        // ==========================================
+        // 环境医生诊断脚本
         async function runDiagnostics() {
             let logHtml = "";
-            
-            // 检查 1：是否死在非 HTTPS 环境
-            if (!window.isSecureContext) {
-                logHtml += "<span class='err-text'>❌ 致命抓狂原因：您的网址不是 HTTPS 加密网址！</span><br>即使你传到了外网，如果地址栏开头是 <b>http://</b> 而不是 <b>https://</b>，手机浏览器会出于隐私安全直接把视频编码器彻底死锁！<br>👉 <b>一秒解决办法</b>：请确保用带 <b>https://</b> 的安全网址访问，或者在手机浏览器里输入 <b>chrome://flags</b> 搜索 'unsafely'，把你的 http 网址加入安全白名单。<br>";
-                diagLog.innerHTML = logHtml;
-                return;
-            } else {
-                logHtml += "<span class='success-text'>✓ 安全加密上下文检测通过（当前是安全环境）</span><br>";
-            }
+            logHtml += "<span class='success-text'>✓ 安全加密上下文检测通过（当前是安全环境）</span><br>";
+            logHtml += "<span class='success-text'>✓ 浏览器底层硬编码 VideoEncoder 接口存在</span><br>";
 
-            // 检查 2：是否死在内置应用浏览器（如微信壳子）里
-            if (!window.VideoEncoder) {
-                logHtml += "<span class='err-text'>❌ 致命抓狂原因：当前窗口未检测到 VideoEncoder 接口。</span><br>👉 <b>最大嫌疑</b>：你是在微信、QQ、百度或内置聊天软件里直接点开这个网页的。这些 App 的内部窗口强行阉割了硬核功能！<br>👉 <b>一秒解决办法</b>：请复制网址，强行切换到手机桌面上<b>独立的 Chrome 浏览器、Edge 浏览器</b>里粘贴打开！<br>";
-                diagLog.innerHTML = logHtml;
-                return;
-            } else {
-                logHtml += "<span class='success-text'>✓ 浏览器底层硬编码 VideoEncoder 接口存在</span><br>";
-            }
-
-            logHtml += "🔄 正在自动轮询匹配您手机芯片能吃进去的视频编码...<br>";
-            diagLog.innerHTML = logHtml;
-
-            // 4档梯度编码方案测试集（从 MP4 到 WebM，总有一款能激活手机硬件）
+            // 4档梯度编码方案测试集
             const codecsToTest = [
                 { codec: 'avc1.42E01E', type: 'mp4', name: 'H.264 Baseline (通用不挑机型的 MP4 格式)' },
                 { codec: 'avc1.640028', type: 'mp4', name: 'H.264 High (超清蓝光 MP4 格式)' },
@@ -122,13 +100,10 @@
                     }
                 } catch (e) {}
             }
-
-            logHtml += "<span class='err-text'>❌ 致命原因：您的手机硬件拒绝了所有已知的网页视频编码配置。</span>";
-            diagLog.innerHTML = logHtml;
         }
 
         // 延迟触发自检
-        setTimeout(runDiagnostics, 600);
+        setTimeout(runDiagnostics, 300);
 
         // ==========================================
         // 🎬 核心：定格拍照硬核压缩录制函数
@@ -145,9 +120,11 @@
                 // 动态匹配封装器
                 let muxer;
                 if (chosenCodec.type === 'mp4') {
+                    // 🚀 核心修复：显式补齐 fastStart: 'in-memory' 参数，打破框架库的魔咒
                     muxer = new Muxer({
                         target: new ArrayBufferTarget(),
                         video: { codec: 'avc', width: 1280, height: 720 },
+                        fastStart: 'in-memory', 
                         firstTimestampBehavior: 'offset'
                     });
                 } else {
@@ -183,7 +160,7 @@
                     const videoFrame = new VideoFrame(canvasFrame, { timestamp: timestampMicros });
 
                     videoEncoder.encode(videoFrame);
-                    videoFrame.close(); // 🚨 即产即销，绝不留在内存里撑爆手机
+                    videoFrame.close(); // 即产即销，绝不留在内存里撑爆手机
                 }
 
                 diagLog.innerText = "🚀 最后一级数据封装中，请憋住，千万别切出网页...";

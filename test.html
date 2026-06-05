@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>50秒终极自检兼容录制版</title>
+    <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.7.0/dist/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        body {
+            margin: 0; background-color: #0d0e15; color: #fff;
+            font-family: -apple-system, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+        .stage-container {
+            width: 90vw; height: calc(90vw * 9 / 16);
+            overflow: hidden; position: relative;
+            border: 2px solid #2a2d42; border-radius: 12px;
+        }
+        /* 1280x720 高清纯 HTML/CSS 动效舞台 */
+        #stage {
+            width: 1280px; height: 720px; background: #141526;
+            position: absolute; left: 0; top: 0;
+            transform: scale(calc(90vw / 1280)); transform-origin: left top;
+        }
+        .ball {
+            width: 120px; height: 120px; background: #00ffcc; border-radius: 50%;
+            position: absolute; left: 100px; top: 300px; box-shadow: 0 0 30px #00ffcc;
+        }
+        .controls { margin-top: 25px; text-align: center; max-width: 90vw; }
+        button {
+            background: #3b82f6; color: white; border: none; padding: 14px 32px;
+            font-size: 1.1rem; border-radius: 25px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        button:disabled { background: #4b5563; box-shadow: none; cursor: not-allowed; }
+        /* 诊断日志显示框 */
+        #diag-log {
+            margin-top: 15px; padding: 12px; background: #1e2030; border-radius: 8px;
+            font-size: 0.9rem; text-align: left; border: 1px solid #3b4261; line-height: 1.6;
+        }
+        .err-text { color: #ff4a4a; font-weight: bold; }
+        .success-text { color: #00ff88; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="stage-container">
+        <div id="stage">
+            <div class="ball"></div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button id="start-btn" onclick="startRendering()" disabled>请先等待环境自检...</button>
+        <div id="diag-log">🔍 正在深度检测您的手机浏览器环境，请稍候...</div>
+    </div>
+
+    <script type="module">
+        import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.mjs';
+        import { Muxer as WebmMuxer, ArrayBufferTarget as WebmTarget } from 'https://cdn.jsdelivr.net/npm/webm-muxer@3.1.2/build/webm-muxer.mjs';
+
+        const btn = document.getElementById('start-btn');
+        const diagLog = document.getElementById('diag-log');
+        
+        // 初始化包含 CSS 属性的 GSAP 动画时间轴
+        const tl = gsap.timeline({ paused: true });
+        tl.to(".ball", { duration: 5, x: 960, rotation: 720, backgroundColor: "#ff007f", boxShadow: "0 0 50px #ff007f", ease: "bounce.out" })
+          .to(".ball", { duration: 5, x: 100, y: -200, scale: 1.6, backgroundColor: "#a855f7", boxShadow: "0 0 40px #a855f7", ease: "power2.inOut" });
+
+        let chosenCodec = null;
+
+        // ==========================================
+        // 🩺 核心：全自动环境医生诊断脚本
+        // ==========================================
+        async function runDiagnostics() {
+            let logHtml = "";
+            
+            // 检查 1：是否死在非 HTTPS 环境
+            if (!window.isSecureContext) {
+                logHtml += "<span class='err-text'>❌ 致命抓狂原因：您的网址不是 HTTPS 加密网址！</span><br>即使你传到了外网，如果地址栏开头是 <b>http://</b> 而不是 <b>https://</b>，手机浏览器会出于隐私安全直接把视频编码器彻底死锁！<br>👉 <b>一秒解决办法</b>：请确保用带 <b>https://</b> 的安全网址访问，或者在手机浏览器里输入 <b>chrome://flags</b> 搜索 'unsafely'，把你的 http 网址加入安全白名单。<br>";
+                diagLog.innerHTML = logHtml;
+                return;
+            } else {
+                logHtml += "<span class='success-text'>✓ 安全加密上下文检测通过（当前是安全环境）</span><br>";
+            }
+
+            // 检查 2：是否死在内置应用浏览器（如微信壳子）里
+            if (!window.VideoEncoder) {
+                logHtml += "<span class='err-text'>❌ 致命抓狂原因：当前窗口未检测到 VideoEncoder 接口。</span><br>👉 <b>最大嫌疑</b>：你是在微信、QQ、百度或内置聊天软件里直接点开这个网页的。这些 App 的内部窗口强行阉割了硬核功能！<br>👉 <b>一秒解决办法</b>：请复制网址，强行切换到手机桌面上<b>独立的 Chrome 浏览器、Edge 浏览器</b>里粘贴打开！<br>";
+                diagLog.innerHTML = logHtml;
+                return;
+            } else {
+                logHtml += "<span class='success-text'>✓ 浏览器底层硬编码 VideoEncoder 接口存在</span><br>";
+            }
+
+            logHtml += "🔄 正在自动轮询匹配您手机芯片能吃进去的视频编码...<br>";
+            diagLog.innerHTML = logHtml;
+
+            // 4档梯度编码方案测试集（从 MP4 到 WebM，总有一款能激活手机硬件）
+            const codecsToTest = [
+                { codec: 'avc1.42E01E', type: 'mp4', name: 'H.264 Baseline (通用不挑机型的 MP4 格式)' },
+                { codec: 'avc1.640028', type: 'mp4', name: 'H.264 High (超清蓝光 MP4 格式)' },
+                { codec: 'vp8', type: 'webm', name: 'VP8 (普适性 WebM 格式)' },
+                { codec: 'vp09.00.10.08', type: 'webm', name: 'VP9 (超清 WebM 格式)' }
+            ];
+
+            for (let item of codecsToTest) {
+                try {
+                    const support = await VideoEncoder.isConfigSupported({
+                        codec: item.codec, width: 1280, height: 720, bitrate: 5000000, framerate: 30
+                    });
+                    if (support.supported) {
+                        chosenCodec = item;
+                        logHtml += `<span class='success-text'>✓ 芯片硬件匹配成功：支持 ${item.name}</span><br>`;
+                        logHtml += "🎉 <b>自检完美通关！手机硬件全部就绪！</b>";
+                        diagLog.innerHTML = logHtml;
+                        btn.disabled = false;
+                        btn.innerText = `一键渲染 50 秒视频 (.${item.type})`;
+                        return;
+                    }
+                } catch (e) {}
+            }
+
+            logHtml += "<span class='err-text'>❌ 致命原因：您的手机硬件拒绝了所有已知的网页视频编码配置。</span>";
+            diagLog.innerHTML = logHtml;
+        }
+
+        // 延迟触发自检
+        setTimeout(runDiagnostics, 600);
+
+        // ==========================================
+        // 🎬 核心：定格拍照硬核压缩录制函数
+        // ==========================================
+        window.startRendering = async () => {
+            if (!chosenCodec) return;
+            btn.disabled = true;
+
+            const fps = 30;
+            const totalSeconds = 50; // 🎬 严格满足要求的 50 秒超长规格
+            const totalFrames = fps * totalSeconds;
+
+            try {
+                // 动态匹配封装器
+                let muxer;
+                if (chosenCodec.type === 'mp4') {
+                    muxer = new Muxer({
+                        target: new ArrayBufferTarget(),
+                        video: { codec: 'avc', width: 1280, height: 720 },
+                        firstTimestampBehavior: 'offset'
+                    });
+                } else {
+                    muxer = new WebmMuxer({
+                        target: new WebmTarget(),
+                        video: { codec: chosenCodec.codec === 'vp8' ? 'V_VP8' : 'V_VP9', width: 1280, height: 720 },
+                        firstTimestampBehavior: 'offset'
+                    });
+                }
+
+                let videoEncoder = new VideoEncoder({
+                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+                    error: (e) => { diagLog.innerText = "编码器崩了: " + e.message; }
+                });
+
+                videoEncoder.configure({
+                    codec: chosenCodec.codec, width: 1280, height: 720, bitrate: 5000000
+                });
+
+                // 开始跑帧循环
+                for (let i = 0; i < totalFrames; i++) {
+                    diagLog.innerText = `⚡ 正在进行【定格拍照并销毁内存】: ${Math.round((i / totalFrames) * 100)}% (${i}/${totalFrames} 帧)`;
+
+                    // 让10秒的GSAP基础动画在50秒内完美循环播放5次
+                    const timePosition = (i / fps) % 10;
+                    tl.seek(timePosition);
+
+                    await new Promise(resolve => requestAnimationFrame(resolve));
+
+                    // 摄影师截图（同时通吃盒子里的纯CSS样式和文字）
+                    const canvasFrame = await modernScreenshot.domToCanvas(document.getElementById('stage'));
+                    const timestampMicros = Math.round((i / fps) * 1000000);
+                    const videoFrame = new VideoFrame(canvasFrame, { timestamp: timestampMicros });
+
+                    videoEncoder.encode(videoFrame);
+                    videoFrame.close(); // 🚨 即产即销，绝不留在内存里撑爆手机
+                }
+
+                diagLog.innerText = "🚀 最后一级数据封装中，请憋住，千万别切出网页...";
+                await videoEncoder.flush();
+                muxer.finalize();
+
+                const { buffer } = muxer.target;
+                const fileMime = chosenCodec.type === 'mp4' ? 'video/mp4' : 'video/webm';
+                const blob = new Blob([buffer], { type: fileMime });
+                const videoUrl = URL.createObjectURL(blob);
+
+                // 触发下载
+                const downloadLink = document.createElement('a');
+                downloadLink.href = videoUrl;
+                downloadLink.download = `Mobile_HQ_Render_50s.${chosenCodec.type}`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(videoUrl);
+
+                diagLog.innerHTML = `<span class='success-text'>🎉 大功告成！50秒超清视频已成功灌进手机！格式：.${chosenCodec.type}，请去手机通知栏或相册查看！</span>`;
+                btn.disabled = false;
+
+            } catch (err) {
+                diagLog.innerText = "渲染崩溃: " + err.message;
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

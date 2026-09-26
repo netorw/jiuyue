@@ -1,195 +1,754 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>50秒无损录制-参数修复终极版</title>
-    <script src="https://cdn.jsdelivr.net/npm/modern-screenshot@4.7.0/dist/index.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <title>体素微缩建筑工地沙盘 (WebGL / Three.js)</title>
     <style>
         body {
-            margin: 0; background-color: #0d0e15; color: #fff;
-            font-family: -apple-system, sans-serif;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 100vh; overflow: hidden;
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
         }
-        .stage-container {
-            width: 90vw; height: calc(90vw * 9 / 16);
-            overflow: hidden; position: relative;
-            border: 2px solid #2a2d42; border-radius: 12px;
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        /* 1280x720 高清纯 HTML/CSS 动效舞台 */
-        #stage {
-            width: 1280px; height: 720px; background: #141526;
-            position: absolute; left: 0; top: 0;
-            transform: scale(calc(90vw / 1280)); transform-origin: left top;
+        h1 { margin: 0 0 10px 0; font-size: 18px; color: #f39c12; }
+        p { margin: 5px 0; font-size: 13px; color: #ccc; }
+        .key { display: inline-block; background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        #loading {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; z-index: 999; transition: opacity 0.5s;
         }
-        .ball {
-            width: 120px; height: 120px; background: #00ffcc; border-radius: 50%;
-            position: absolute; left: 100px; top: 300px; box-shadow: 0 0 30px #00ffcc;
-        }
-        .controls { margin-top: 25px; text-align: center; max-width: 90vw; }
-        button {
-            background: #3b82f6; color: white; border: none; padding: 14px 32px;
-            font-size: 1.1rem; border-radius: 25px; cursor: pointer; font-weight: bold;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-        }
-        button:disabled { background: #4b5563; box-shadow: none; cursor: not-allowed; }
-        /* 诊断日志显示框 */
-        #diag-log {
-            margin-top: 15px; padding: 12px; background: #1e2030; border-radius: 8px;
-            font-size: 0.9rem; text-align: left; border: 1px solid #3b4261; line-height: 1.6;
-        }
-        .success-text { color: #00ff88; font-weight: bold; }
     </style>
+    <!-- 使用 Import Map 引入 Three.js r160 -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
-
-    <div class="stage-container">
-        <div id="stage">
-            <div class="ball"></div>
-        </div>
-    </div>
-    
-    <div class="controls">
-        <button id="start-btn" onclick="startRendering()" disabled>请先等待环境自检...</button>
-        <div id="diag-log">🔍 正在深度检测您的手机浏览器环境，请稍候...</div>
+    <div id="loading">生成微缩世界中，请稍候...</div>
+    <div id="ui-layer">
+        <h1>体素微缩工地沙盘</h1>
+        <p>📸 <b>视角控制</b>: 左键拖拽环视 / 滚轮缩放 / 闲置自动环绕</p>
+        <p>🔘 <b>物理交互</b>: 点击桌子前方的 <b>三个控制旋钮</b> (调节速度/时间/尘土)</p>
+        <p>⛈️ <b>暴雨模式</b>: 按下 <span class="key">Space 空格键</span> 触发/关闭暴雨</p>
+        <p id="status-text" style="color: #4ade80; margin-top:10px; font-weight:bold;">当前状态: 正常施工</p>
     </div>
 
     <script type="module">
-        import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.mjs';
-        import { Muxer as WebmMuxer, ArrayBufferTarget as WebmTarget } from 'https://cdn.jsdelivr.net/npm/webm-muxer@3.1.2/build/webm-muxer.mjs';
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        const btn = document.getElementById('start-btn');
-        const diagLog = document.getElementById('diag-log');
+        // ==========================================
+        // 全局状态与配置
+        // ==========================================
+        const CONFIG = {
+            voxelSize: 1,
+            sandBoxSize: 60, // 沙盘尺寸
+            deskSize: 120, // 桌面尺寸
+            speedMultiplier: 1,
+            timeCycleActive: true,
+            dustActive: true,
+            isRaining: false,
+            timeOfDay: 12, // 0-24小时制
+        };
+
+        const state = {
+            time: 0,
+            lastFrameTime: performance.now(),
+            idleTimer: 0,
+        };
+
+        // ==========================================
+        // 初始化场景、相机、渲染器
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x111111, 0.005);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 500);
+        camera.position.set(0, 45, 75); // 第三人平视人眼高度俯视
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制像素比保性能
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; // 限制不能看到桌面下
+        controls.minDistance = 20;
+        controls.maxDistance = 150;
+
+        // ==========================================
+        // 材质与纹理生成 (Procedural)
+        // ==========================================
+        const textureGen = {
+            createWood: () => {
+                const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#3a2318'; ctx.fillRect(0, 0, 512, 512);
+                for (let i = 0; i < 200; i++) {
+                    ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
+                    ctx.fillRect(0, Math.random() * 512, 512, Math.random() * 5 + 1);
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(4, 4);
+                return tex;
+            },
+            createBlueprint: () => {
+                const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#1e3799'; ctx.fillRect(0, 0, 512, 512);
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+                for(let i=0; i<512; i+=32) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+                ctx.strokeRect(64, 64, 384, 384);
+                ctx.beginPath(); ctx.moveTo(64,64); ctx.lineTo(448,448); ctx.stroke();
+                return new THREE.CanvasTexture(canvas);
+            },
+            createText: (text, color='#fff', bg='#333') => {
+                const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 128);
+                ctx.fillStyle = color; ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(text, 128, 64);
+                return new THREE.CanvasTexture(canvas);
+            }
+        };
+
+        const materials = {
+            desk: new THREE.MeshStandardMaterial({ map: textureGen.createWood(), roughness: 0.7, metalness: 0.1 }),
+            voxel: new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 }), // 共用材质实例化渲染
+            glass: new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.6, roughness: 0.1 }),
+            wetDesk: 0.1, // 下雨时桌面粗糙度
+            normalDesk: 0.7
+        };
+
+        // ==========================================
+        // 场景载体：桌面与外围摆件
+        // ==========================================
+        const envGroup = new THREE.Group();
+        scene.add(envGroup);
+
+        // 实木工作台
+        const deskGeo = new THREE.BoxGeometry(CONFIG.deskSize, 5, CONFIG.deskSize);
+        const desk = new THREE.Mesh(deskGeo, materials.desk);
+        desk.position.y = -2.5;
+        desk.receiveShadow = true;
+        envGroup.add(desk);
+
+        // 沙盘基座
+        const sandboxBaseGeo = new THREE.BoxGeometry(CONFIG.sandBoxSize + 2, 2, CONFIG.sandBoxSize + 2);
+        const sandboxBaseMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+        const sandboxBase = new THREE.Mesh(sandboxBaseGeo, sandboxBaseMat);
+        sandboxBase.position.y = 1;
+        sandboxBase.receiveShadow = true;
+        sandboxBase.castShadow = true;
+        envGroup.add(sandboxBase);
+
+        // 蓝图图纸
+        const blueprint = new THREE.Mesh(
+            new THREE.PlaneGeometry(30, 20),
+            new THREE.MeshStandardMaterial({ map: textureGen.createBlueprint(), roughness: 0.9 })
+        );
+        blueprint.rotation.x = -Math.PI / 2;
+        blueprint.rotation.z = Math.PI / 6;
+        blueprint.position.set(-40, 0.05, 30);
+        envGroup.add(blueprint);
+
+        // 安全帽 (黄色半球)
+        const helmetGroup = new THREE.Group();
+        const helmetGeo = new THREE.SphereGeometry(3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const helmetMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.3, metalness: 0.1 });
+        const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+        const helmetBrim = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 0.2, 16), helmetMat);
+        helmetBrim.position.y = 0.1;
+        helmetGroup.add(helmet, helmetBrim);
+        helmetGroup.position.set(40, 0, 35);
+        helmetGroup.rotation.y = -Math.PI / 4;
+        helmetGroup.castShadow = true;
+        envGroup.add(helmetGroup);
+
+        // 金属水平仪
+        const levelGeo = new THREE.BoxGeometry(15, 1, 2);
+        const levelMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
+        const level = new THREE.Mesh(levelGeo, levelMat);
+        level.position.set(-45, 0.5, -20);
+        level.rotation.y = Math.PI / 8;
+        level.castShadow = true;
+        envGroup.add(level);
+
+        // 控制旋钮 (物理交互)
+        const knobs = [];
+        const knobLabels = ['运行速度', '昼夜循环', '施工扬尘'];
+        for(let i=0; i<3; i++) {
+            const knob = new THREE.Mesh(
+                new THREE.CylinderGeometry(2, 2, 1, 16),
+                new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4, metalness: 0.6 })
+            );
+            knob.position.set(-15 + i * 15, 0.5, 50);
+            knob.userData = { type: 'knob', index: i };
+            knob.castShadow = true;
+            envGroup.add(knob);
+            knobs.push(knob);
+
+            const indicator = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 1.2, 2),
+                new THREE.MeshStandardMaterial({ color: 0xe74c3c })
+            );
+            indicator.position.z = -1;
+            knob.add(indicator);
+
+            const label = new THREE.Mesh(
+                new THREE.PlaneGeometry(6, 3),
+                new THREE.MeshBasicMaterial({ map: textureGen.createText(knobLabels[i]), transparent: true })
+            );
+            label.rotation.x = -Math.PI / 2;
+            label.position.set(-15 + i * 15, 0.05, 55);
+            envGroup.add(label);
+        }
+
+        // ==========================================
+        // 核心性能：InstancedMesh 静态体素世界生成
+        // ==========================================
+        const voxelData = []; // 存储所有静态体素的数据 {p: [x,y,z], c: color}
+        const s = CONFIG.sandBoxSize / 2;
         
-        // 初始化包含 CSS 属性的 GSAP 动画时间轴
-        const tl = gsap.timeline({ paused: true });
-        tl.to(".ball", { duration: 5, x: 960, rotation: 720, backgroundColor: "#ff007f", boxShadow: "0 0 50px #ff007f", ease: "bounce.out" })
-          .to(".ball", { duration: 5, x: 100, y: -200, scale: 1.6, backgroundColor: "#a855f7", boxShadow: "0 0 40px #a855f7", ease: "power2.inOut" });
+        // 调色板
+        const colors = {
+            dirt: new THREE.Color(0x6e4b3b),
+            concrete: new THREE.Color(0x8c928e),
+            asphalt: new THREE.Color(0x3a3d3c),
+            steel: new THREE.Color(0x4a4d52),
+            blueBoard: new THREE.Color(0x3498db),
+            whiteBoard: new THREE.Color(0xecf0f1),
+            wood: new THREE.Color(0xc28f5b),
+            grass: new THREE.Color(0x4b6b3e),
+            yellow: new THREE.Color(0xf1c40f)
+        };
 
-        let chosenCodec = null;
+        // 1. 生成地基与地表
+        for (let x = -s; x < s; x++) {
+            for (let z = -s; z < s; z++) {
+                // 基坑开挖区 (右下角区域挖空)
+                const inPit = (x > 5 && x < 25 && z > 5 && z < 25);
+                // 临时道路
+                const isRoad = (x > -20 && x < 5 && z > -15 && z < 25) || (x > -20 && x < 25 && z > -15 && z < -5);
 
-        // 环境医生诊断脚本
-        async function runDiagnostics() {
-            let logHtml = "";
-            logHtml += "<span class='success-text'>✓ 安全加密上下文检测通过（当前是安全环境）</span><br>";
-            logHtml += "<span class='success-text'>✓ 浏览器底层硬编码 VideoEncoder 接口存在</span><br>";
-
-            // 4档梯度编码方案测试集
-            const codecsToTest = [
-                { codec: 'avc1.42E01E', type: 'mp4', name: 'H.264 Baseline (通用不挑机型的 MP4 格式)' },
-                { codec: 'avc1.640028', type: 'mp4', name: 'H.264 High (超清蓝光 MP4 格式)' },
-                { codec: 'vp8', type: 'webm', name: 'VP8 (普适性 WebM 格式)' },
-                { codec: 'vp09.00.10.08', type: 'webm', name: 'VP9 (超清 WebM 格式)' }
-            ];
-
-            for (let item of codecsToTest) {
-                try {
-                    const support = await VideoEncoder.isConfigSupported({
-                        codec: item.codec, width: 1280, height: 720, bitrate: 5000000, framerate: 30
-                    });
-                    if (support.supported) {
-                        chosenCodec = item;
-                        logHtml += `<span class='success-text'>✓ 芯片硬件匹配成功：支持 ${item.name}</span><br>`;
-                        logHtml += "🎉 <b>自检完美通关！手机硬件全部就绪！</b>";
-                        diagLog.innerHTML = logHtml;
-                        btn.disabled = false;
-                        btn.innerText = `一键渲染 50 秒视频 (.${item.type})`;
-                        return;
-                    }
-                } catch (e) {}
+                if (inPit) {
+                    voxelData.push({ p: [x, 2, z], c: colors.dirt }); // 坑底
+                    // 坑边护坡
+                    if (x === 6 || x === 24 || z === 6 || z === 24) voxelData.push({ p: [x, 3, z], c: colors.dirt });
+                } else {
+                    // 表层土/路面
+                    voxelData.push({ p: [x, 2, z], c: colors.dirt });
+                    voxelData.push({ p: [x, 3, z], c: isRoad ? colors.asphalt : (Math.random()>0.8?colors.grass:colors.dirt) });
+                }
             }
         }
 
-        // 延迟触发自检
-        setTimeout(runDiagnostics, 300);
+        // 2. 渣土堆 (左上角)
+        for(let i=0; i<300; i++) {
+            const rx = -20 + Math.random() * 10;
+            const rz = -25 + Math.random() * 10;
+            const ry = 4 + Math.random() * 3 * (1 - Math.sqrt((rx+15)**2 + (rz+20)**2)/10);
+            if(ry > 3) voxelData.push({ p: [Math.floor(rx), Math.floor(ry), Math.floor(rz)], c: colors.dirt });
+        }
 
-        // ==========================================
-        // 🎬 核心：定格拍照硬核压缩录制函数
-        // ==========================================
-        window.startRendering = async () => {
-            if (!chosenCodec) return;
-            btn.disabled = true;
-
-            const fps = 30;
-            const totalSeconds = 50; // 🎬 严格满足要求的 50 秒超长规格
-            const totalFrames = fps * totalSeconds;
-
-            try {
-                // 动态匹配封装器
-                let muxer;
-                if (chosenCodec.type === 'mp4') {
-                    // 🚀 核心修复：显式补齐 fastStart: 'in-memory' 参数，打破框架库的魔咒
-                    muxer = new Muxer({
-                        target: new ArrayBufferTarget(),
-                        video: { codec: 'avc', width: 1280, height: 720 },
-                        fastStart: 'in-memory', 
-                        firstTimestampBehavior: 'offset'
-                    });
-                } else {
-                    muxer = new WebmMuxer({
-                        target: new WebmTarget(),
-                        video: { codec: chosenCodec.codec === 'vp8' ? 'V_VP8' : 'V_VP9', width: 1280, height: 720 },
-                        firstTimestampBehavior: 'offset'
-                    });
+        // 3. 在建高层楼房基座 (左下角)
+        for (let y = 4; y < 15; y+=2) {
+            for (let x = -25; x < -10; x+=2) {
+                for (let z = 10; z < 25; z+=2) {
+                    // 核心筒
+                    if(x>-20 && x<-15 && z>15 && z<20) {
+                        voxelData.push({ p: [x, y, z], c: colors.concrete });
+                        voxelData.push({ p: [x+1, y, z], c: colors.concrete });
+                    }
+                    // 脚手架/柱子
+                    voxelData.push({ p: [x, y, z], c: colors.steel });
+                    // 楼板边缘
+                    if (y % 4 === 0) voxelData.push({ p: [x, y, z], c: colors.concrete });
                 }
-
-                let videoEncoder = new VideoEncoder({
-                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-                    error: (e) => { diagLog.innerText = "编码器崩了: " + e.message; }
-                });
-
-                videoEncoder.configure({
-                    codec: chosenCodec.codec, width: 1280, height: 720, bitrate: 5000000
-                });
-
-                // 开始跑帧循环
-                for (let i = 0; i < totalFrames; i++) {
-                    diagLog.innerText = `⚡ 正在进行【定格拍照并销毁内存】: ${Math.round((i / totalFrames) * 100)}% (${i}/${totalFrames} 帧)`;
-
-                    // 让10秒的GSAP基础动画在50秒内完美循环播放5次
-                    const timePosition = (i / fps) % 10;
-                    tl.seek(timePosition);
-
-                    await new Promise(resolve => requestAnimationFrame(resolve));
-
-                    // 摄影师截图（同时通吃盒子里的纯CSS样式和文字）
-                    const canvasFrame = await modernScreenshot.domToCanvas(document.getElementById('stage'));
-                    const timestampMicros = Math.round((i / fps) * 1000000);
-                    const videoFrame = new VideoFrame(canvasFrame, { timestamp: timestampMicros });
-
-                    videoEncoder.encode(videoFrame);
-                    videoFrame.close(); // 即产即销，绝不留在内存里撑爆手机
-                }
-
-                diagLog.innerText = "🚀 最后一级数据封装中，请憋住，千万别切出网页...";
-                await videoEncoder.flush();
-                muxer.finalize();
-
-                const { buffer } = muxer.target;
-                const fileMime = chosenCodec.type === 'mp4' ? 'video/mp4' : 'video/webm';
-                const blob = new Blob([buffer], { type: fileMime });
-                const videoUrl = URL.createObjectURL(blob);
-
-                // 触发下载
-                const downloadLink = document.createElement('a');
-                downloadLink.href = videoUrl;
-                downloadLink.download = `Mobile_HQ_Render_50s.${chosenCodec.type}`;
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-
-                document.body.removeChild(downloadLink);
-                URL.revokeObjectURL(videoUrl);
-
-                diagLog.innerHTML = `<span class='success-text'>🎉 大功告成！50秒超清视频已成功灌进手机！格式：.${chosenCodec.type}，请去手机通知栏或相册查看！</span>`;
-                btn.disabled = false;
-
-            } catch (err) {
-                diagLog.innerText = "渲染崩溃: " + err.message;
-                btn.disabled = false;
             }
+        }
+
+        // 4. 临时板房办公区 (右上角)
+        for (let bx = 10; bx <= 25; bx+=8) {
+            for(let by = 4; by <= 7; by+=3) { // 两层
+                for(let x=0; x<6; x++){
+                    for(let z=0; z<4; z++){
+                        if (x===0 || x===5 || z===0 || z===3 || by===7) { // 墙和顶
+                            let c = (by===7 && (x!==0&&x!==5&&z!==0&&z!==3)) ? colors.blueBoard : colors.whiteBoard;
+                            // 窗户留空 (非精细判断，大致留空)
+                            if (z===0 && x>1 && x<4 && by===4) continue;
+                            voxelData.push({ p: [bx+x, by, -25+z], c: c });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. 钢筋加工棚与物料堆放 (中间偏上)
+        for(let x=-10; x<5; x++) {
+            for(let z=-25; z<-18; z++) {
+                if(x%3===0 && z%3===0 && x!==-1) voxelData.push({ p: [x, 4, z], c: colors.steel }); // 柱
+                voxelData.push({ p: [x, 7, z], c: colors.blueBoard }); // 顶
+            }
+        }
+        // 堆叠钢筋、水泥
+        for(let i=0; i<50; i++) {
+            voxelData.push({ p: [-8+Math.random()*4, 4, -22+Math.random()*2], c: colors.steel }); // 钢筋堆
+            voxelData.push({ p: [0+Math.floor(Math.random()*3), 4+Math.floor(Math.random()*2), -22+Math.floor(Math.random()*3)], c: colors.whiteBoard }); // 水泥袋
+        }
+
+        // 6. 围挡大门与警示设施
+        for(let x=-s; x<s; x++) {
+            if(x<-5 || x>5) voxelData.push({ p: [x, 4, 29], c: colors.blueBoard }); // 前围挡
+            voxelData.push({ p: [x, 4, -30], c: colors.blueBoard }); // 后围挡
+        }
+        for(let z=-s; z<s; z++) {
+            voxelData.push({ p: [-30, 4, z], c: colors.blueBoard });
+            voxelData.push({ p: [29, 4, z], c: colors.blueBoard });
+        }
+
+        // 实例化生成静态网格
+        const voxelGeo = new THREE.BoxGeometry(CONFIG.voxelSize, CONFIG.voxelSize, CONFIG.voxelSize);
+        const staticInstancedMesh = new THREE.InstancedMesh(voxelGeo, materials.voxel, voxelData.length);
+        const dummy = new THREE.Object3D();
+        const _color = new THREE.Color();
+        
+        voxelData.forEach((data, index) => {
+            dummy.position.set(data.p[0], data.p[1], data.p[2]);
+            dummy.updateMatrix();
+            staticInstancedMesh.setMatrixAt(index, dummy.matrix);
+            staticInstancedMesh.setColorAt(index, _color.copy(data.c));
+        });
+        staticInstancedMesh.castShadow = true;
+        staticInstancedMesh.receiveShadow = true;
+        scene.add(staticInstancedMesh);
+
+        // ==========================================
+        // 动态机械设备 (层级运动学 FK 构建，杜绝穿模)
+        // 严格规划坐标，确保互不干涉
+        // ==========================================
+        const vehicles = [];
+
+        // 创建挖掘机 (坐标：基坑边缘 x:3, z:15)
+        const excavator = new THREE.Group();
+        excavator.position.set(3, 4.5, 15);
+        
+        const track = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 4), new THREE.MeshStandardMaterial({color: 0x333333}));
+        const cabGroup = new THREE.Group();
+        cabGroup.position.y = 1;
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), new THREE.MeshStandardMaterial({color: 0xf1c40f}));
+        cab.position.set(-0.5, 1.25, 0);
+        cabGroup.add(cab);
+        
+        const boomGroup = new THREE.Group();
+        boomGroup.position.set(1, 1, 0);
+        const boom = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 0.6), new THREE.MeshStandardMaterial({color: 0xf1c40f}));
+        boom.position.set(2, 0, 0);
+        boomGroup.add(boom);
+
+        const armGroup = new THREE.Group();
+        armGroup.position.set(4, 0, 0);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(3, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xf1c40f}));
+        arm.position.set(1.5, 0, 0);
+        armGroup.add(arm);
+
+        const bucketGroup = new THREE.Group();
+        bucketGroup.position.set(3, 0, 0);
+        const bucket = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 1), new THREE.MeshStandardMaterial({color: 0x4a4d52}));
+        bucket.position.set(0.5, -0.2, 0);
+        bucketGroup.add(bucket);
+
+        armGroup.add(bucketGroup);
+        boomGroup.add(armGroup);
+        cabGroup.add(boomGroup);
+        excavator.add(track, cabGroup);
+        scene.add(excavator);
+        
+        vehicles.push({
+            update: (time) => {
+                // 挖掘循环动画
+                const t = time * 2;
+                cabGroup.rotation.y = Math.sin(t * 0.5) * 1.2; // 回转
+                boomGroup.rotation.z = Math.sin(t) * 0.5 + 0.5; // 大臂升降
+                armGroup.rotation.z = Math.cos(t) * 0.5 - 1.0; // 小臂伸缩
+                bucketGroup.rotation.z = Math.sin(t + 1) * 0.5 + 0.5; // 铲斗翻转
+            }
+        });
+
+        // 创建塔吊 (坐标：中心偏左 x:-5, z:5，高度完全避开所有建筑)
+        const crane = new THREE.Group();
+        crane.position.set(-5, 4, 5);
+        const mast = new THREE.Mesh(new THREE.BoxGeometry(1, 20, 1), new THREE.MeshStandardMaterial({color: 0xf1c40f, wireframe: true}));
+        mast.position.y = 10;
+        const craneHead = new THREE.Group();
+        craneHead.position.y = 20;
+        const jib = new THREE.Mesh(new THREE.BoxGeometry(25, 1, 1), new THREE.MeshStandardMaterial({color: 0xf1c40f, wireframe: true}));
+        jib.position.set(10, 0, 0);
+        const counterWeight = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 1.2), new THREE.MeshStandardMaterial({color: 0x555555}));
+        counterWeight.position.set(-4, 0, 0);
+        
+        // 吊钩与缆绳
+        const hookGroup = new THREE.Group();
+        hookGroup.position.set(18, 0, 0); // 在起重臂上移动
+        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 15), new THREE.MeshStandardMaterial({color: 0x222222}));
+        cable.position.y = -7.5;
+        const hook = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({color: 0xff0000}));
+        hook.position.y = -15;
+        hookGroup.add(cable, hook);
+        
+        craneHead.add(jib, counterWeight, hookGroup);
+        crane.add(mast, craneHead);
+        scene.add(crane);
+
+        // 塔吊夜间探照灯
+        const craneLight = new THREE.SpotLight(0xffffee, 0, 50, Math.PI/6, 0.5, 1);
+        craneLight.position.set(5, 19, 0);
+        craneLight.target = hook;
+        craneHead.add(craneLight);
+
+        vehicles.push({
+            update: (time) => {
+                craneHead.rotation.y = time * 0.3; // 缓慢回转
+                const lift = Math.sin(time * 0.8) * 5;
+                hookGroup.position.x = 10 + Math.sin(time*0.4) * 8; // 变幅小车移动
+                cable.scale.y = (15 + lift) / 15;
+                cable.position.y = -(15 + lift) / 2;
+                hook.position.y = -(15 + lift);
+            }
+        });
+
+        // 渣土卡车 (沿环形临时道路行驶)
+        const truck = new THREE.Group();
+        const truckCab = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.5), new THREE.MeshStandardMaterial({color: 0xff3333}));
+        truckCab.position.set(1.5, 1.5, 0);
+        const truckBed = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.5, 2.5), new THREE.MeshStandardMaterial({color: 0x444444}));
+        truckBed.position.set(-1.5, 1.5, 0);
+        const load = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 2), new THREE.MeshStandardMaterial({color: 0x6e4b3b}));
+        load.position.set(-1.5, 2.5, 0);
+        truck.add(truckCab, truckBed, load);
+        scene.add(truck);
+
+        // 卡车行驶路径点 (矩形) x: -10 to 5, z: -10 to 20
+        const path = [
+            new THREE.Vector3(-10, 4, 20),
+            new THREE.Vector3(-10, 4, -10),
+            new THREE.Vector3(5, 4, -10),
+            new THREE.Vector3(5, 4, 20)
+        ];
+        
+        let truckProg = 0;
+        vehicles.push({
+            update: (time, delta) => {
+                truckProg += delta * 5; 
+                const totalLen = 30 + 15 + 30 + 15; // 周长
+                let p = truckProg % totalLen;
+                
+                let p1, p2, f;
+                if (p < 30) { p1 = path[0]; p2 = path[1]; f = p / 30; truck.rotation.y = Math.PI; }
+                else if (p < 45) { p1 = path[1]; p2 = path[2]; f = (p-30)/15; truck.rotation.y = -Math.PI/2; }
+                else if (p < 75) { p1 = path[2]; p2 = path[3]; f = (p-45)/30; truck.rotation.y = 0; }
+                else { p1 = path[3]; p2 = path[0]; f = (p-75)/15; truck.rotation.y = Math.PI/2; }
+                
+                truck.position.lerpVectors(p1, p2, f);
+                // 模拟装土卸土 (在特定区域显示隐藏土堆)
+                load.visible = (p > 10 && p < 60); 
+            }
+        });
+
+        // ==========================================
+        // 细节：体素工人 (InstancedMesh)
+        // ==========================================
+        const workerCount = 50;
+        const workerGeo = new THREE.BoxGeometry(0.6, 1.2, 0.6);
+        const workerMat = new THREE.MeshStandardMaterial({color: 0xf39c12}); // 穿着黄色反光背心
+        const workers = new THREE.InstancedMesh(workerGeo, workerMat, workerCount);
+        const workerData = [];
+        
+        for(let i=0; i<workerCount; i++) {
+            // 分布在各个区域
+            let wx = (Math.random()-0.5)*40;
+            let wz = (Math.random()-0.5)*40;
+            let wy = 4.6; // 站在地表
+            if (wx > 5 && wx < 25 && wz > 5 && wz < 25) wy = 2.6; // 在坑里
+            if (wx > -25 && wx < -10 && wz > 10 && wz < 25) wy = 14.6; // 在楼层上
+            workerData.push({x: wx, y: wy, z: wz, phase: Math.random() * Math.PI * 2});
+        }
+        scene.add(workers);
+
+        // ==========================================
+        // 自定义 Shader：尘土粒子与暴雨粒子
+        // ==========================================
+        // 尘土
+        const dustGeo = new THREE.BufferGeometry();
+        const dustCount = 2000;
+        const dustPos = new Float32Array(dustCount * 3);
+        for(let i=0; i<dustCount*3; i++) dustPos[i] = (Math.random() - 0.5) * 50;
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+        
+        const dustMat = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 }, opacity: { value: 0.5 } },
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+            vertexShader: `
+                uniform float time;
+                void main() {
+                    vec3 pos = position;
+                    pos.y += sin(time * 0.5 + pos.x) * 2.0 + time * 2.0; // 向上飘动
+                    pos.y = mod(pos.y + 10.0, 20.0) - 5.0; // 限制在沙盘高度内
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    gl_PointSize = (10.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform float opacity;
+                void main() {
+                    float dist = distance(gl_PointCoord, vec2(0.5));
+                    if (dist > 0.5) discard;
+                    gl_FragColor = vec4(0.8, 0.7, 0.5, (0.5 - dist) * opacity);
+                }
+            `
+        });
+        const dustParticles = new THREE.Points(dustGeo, dustMat);
+        scene.add(dustParticles);
+
+        // 暴雨
+        const rainGeo = new THREE.BufferGeometry();
+        const rainCount = 5000;
+        const rainPos = new Float32Array(rainCount * 3);
+        for(let i=0; i<rainCount; i++) {
+            rainPos[i*3] = (Math.random() - 0.5) * 80;
+            rainPos[i*3+1] = Math.random() * 40;
+            rainPos[i*3+2] = (Math.random() - 0.5) * 80;
+        }
+        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+        
+        const rainMat = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 }, isRaining: { value: 0.0 } },
+            transparent: true, depthWrite: false,
+            vertexShader: `
+                uniform float time;
+                void main() {
+                    vec3 pos = position;
+                    pos.y -= time * 40.0; // 快速下落
+                    pos.y = mod(pos.y, 40.0);
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    gl_PointSize = (15.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform float isRaining;
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5);
+                    if (length(coord) > 0.5 || isRaining < 0.5) discard;
+                    gl_FragColor = vec4(0.6, 0.8, 1.0, 0.6); // 蓝色雨滴
+                }
+            `
+        });
+        const rainParticles = new THREE.Points(rainGeo, rainMat);
+        scene.add(rainParticles);
+
+        // ==========================================
+        // 环境光照与昼夜循环系统
+        // ==========================================
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(40, 50, 40);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.left = -40; dirLight.shadow.camera.right = 40;
+        dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -40;
+        dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        // 板房窗户暖光 (夜间发光)
+        const officeLight = new THREE.PointLight(0xffaa55, 0, 30);
+        officeLight.position.set(18, 6, -22);
+        scene.add(officeLight);
+
+        const skyColors = {
+            dawn: new THREE.Color(0xff9966),
+            noon: new THREE.Color(0x87ceeb),
+            dusk: new THREE.Color(0xff7744),
+            night: new THREE.Color(0x050510)
         };
+
+        function updateTimeOfDay(t) {
+            let color = new THREE.Color();
+            let intensity = 1.0;
+            
+            // 简单的插值逻辑 (0-24)
+            if (t >= 5 && t < 9) { // 黎明
+                let f = (t - 5) / 4;
+                color.lerpVectors(skyColors.night, skyColors.dawn, f);
+                color.lerp(skyColors.noon, f); 
+                intensity = 0.2 + f * 0.8;
+            } else if (t >= 9 && t < 16) { // 正午
+                color.copy(skyColors.noon);
+                intensity = 1.0;
+            } else if (t >= 16 && t < 20) { // 黄昏
+                let f = (t - 16) / 4;
+                color.lerpVectors(skyColors.noon, skyColors.dusk, f);
+                intensity = 1.0 - f * 0.6;
+            } else { // 夜晚
+                let f = (t >= 20) ? (t - 20)/4 : (t+4)/9;
+                color.lerpVectors(skyColors.dusk, skyColors.night, Math.min(f, 1));
+                intensity = 0.1;
+            }
+
+            scene.background = color;
+            hemiLight.intensity = intensity * 0.6 + 0.1;
+            dirLight.intensity = intensity * 1.5;
+            
+            // 太阳位置计算 (简单的弧线)
+            const angle = (t - 6) / 24 * Math.PI * 2;
+            dirLight.position.x = Math.cos(angle) * 50;
+            dirLight.position.y = Math.sin(angle) * 50 + 10; // 确保不至于完全在地下
+
+            // 夜间灯光开启
+            const isNight = intensity < 0.4;
+            officeLight.intensity = isNight ? 2 : 0;
+            craneLight.intensity = isNight ? 5 : 0;
+            if (CONFIG.isRaining) dirLight.intensity *= 0.5; // 下雨天变暗
+        }
+
+        // ==========================================
+        // 交互系统：鼠标射线与按键
+        // ==========================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(knobs);
+            
+            if (intersects.length > 0) {
+                const knob = intersects[0].object;
+                const index = knob.userData.index;
+                knob.rotation.y += Math.PI / 4; // 旋转动画暗示按动
+                
+                const statusEl = document.getElementById('status-text');
+                if (index === 0) { // 速度
+                    CONFIG.speedMultiplier = CONFIG.speedMultiplier === 1 ? 3 : 1;
+                    statusEl.innerText = `当前状态: 施工速度 x${CONFIG.speedMultiplier}`;
+                } else if (index === 1) { // 昼夜
+                    CONFIG.timeCycleActive = !CONFIG.timeCycleActive;
+                    statusEl.innerText = `当前状态: 昼夜循环 ${CONFIG.timeCycleActive ? '开启' : '暂停'}`;
+                } else if (index === 2) { // 尘土
+                    CONFIG.dustActive = !CONFIG.dustActive;
+                    statusEl.innerText = `当前状态: 施工扬尘 ${CONFIG.dustActive ? '开启' : '关闭'}`;
+                }
+            }
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                CONFIG.isRaining = !CONFIG.isRaining;
+                rainMat.uniforms.isRaining.value = CONFIG.isRaining ? 1.0 : 0.0;
+                // 材质反光效果
+                materials.desk.roughness = CONFIG.isRaining ? materials.wetDesk : materials.normalDesk;
+                materials.voxel.roughness = CONFIG.isRaining ? 0.3 : 0.8; 
+                materials.voxel.needsUpdate = true;
+                document.getElementById('status-text').innerText = `当前状态: ${CONFIG.isRaining ? '⛈️ 暴雨倾盆' : '正常施工'}`;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        controls.addEventListener('start', () => { state.idleTimer = 0; });
+        document.addEventListener('mousemove', () => { state.idleTimer = 0; });
+
+        // 取消加载界面
+        document.getElementById('loading').style.opacity = 0;
+        setTimeout(() => document.getElementById('loading').remove(), 500);
+
+        // ==========================================
+        // 主渲染循环
+        // ==========================================
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const delta = (now - state.lastFrameTime) / 1000;
+            state.lastFrameTime = now;
+            
+            const scaledDelta = delta * CONFIG.speedMultiplier;
+            state.time += scaledDelta;
+
+            // 1. 更新环境时间
+            if (CONFIG.timeCycleActive) {
+                CONFIG.timeOfDay = (CONFIG.timeOfDay + scaledDelta * 0.5) % 24;
+            }
+            updateTimeOfDay(CONFIG.timeOfDay);
+
+            // 2. 机械动画
+            vehicles.forEach(v => v.update(state.time, scaledDelta));
+
+            // 3. 工人动画 (原地跳动/摇摆模拟干活)
+            workerData.forEach((w, i) => {
+                const dy = Math.abs(Math.sin(state.time * 5 + w.phase)) * 0.2;
+                dummy.position.set(w.x, w.y + dy, w.z);
+                dummy.rotation.y = Math.sin(state.time * 2 + w.phase);
+                dummy.updateMatrix();
+                workers.setMatrixAt(i, dummy.matrix);
+            });
+            workers.instanceMatrix.needsUpdate = true;
+
+            // 4. 粒子更新
+            dustMat.uniforms.time.value = state.time;
+            dustMat.uniforms.opacity.value = CONFIG.dustActive ? (CONFIG.isRaining ? 0.1 : 0.5) : 0;
+            if (CONFIG.isRaining) rainMat.uniforms.time.value = state.time;
+
+            // 5. 闲置自动环绕
+            state.idleTimer += delta;
+            if (state.idleTimer > 5.0) { // 5秒不操作则自动旋转
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 1.0;
+            } else {
+                controls.autoRotate = false;
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate(performance.now());
     </script>
 </body>
 </html>

@@ -3,84 +3,664 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light">
     <title>王子九悦 · 成绩成长博物馆</title>
+    <!-- 引入 Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary-color: #4a90e2; --bg-color: #f8f9fa; --card-bg: #ffffff; }
-        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; }
-        
-        /* 标题深度优化：更大、更稳、不留孤字 */
-        header { text-align: center; margin-bottom: 30px; }
-        h1 { 
-            color: var(--primary-color); 
-            margin-bottom: 10px; 
-            font-size: clamp(26px, 8vw, 42px); /* 调大底线和上限 */
-            font-weight: 800; /* 加粗，更有分量 */
-            text-wrap: balance; /* 核心黑科技：自动平衡换行字数，防止末尾剩一个字 */
-            line-height: 1.2;
+        :root {
+            color-scheme: light only;
+            supported-color-schemes: light;
+            /* 纯正莫兰迪低饱和色系：彻底告别刺眼死白 */
+            --primary: #345c8c;
+            --primary-hover: #27476e;
+            --primary-light: #d6e0ea;
+            --success: #2e6b52;
+            --warning: #ad6b1b;
+            --danger: #9e3d3d;
+            --star-gold: #c67a13;
+            /* 层次背景色：全局哑光莫兰迪雾灰陶土调 */
+            --bg: #d7dde5;             /* 页面大底色：柔和雾灰 */
+            --card-bg: #e4ebf2;        /* 大卡片底色：温润莫兰迪淡灰蓝，绝无刺眼死白 */
+            --card-inner: #d6e0ea;     /* 内部小区块/表头底色 */
+            --card-inner-alt: #cdd8e3; /* 列表子项/输入框底色：沉稳耐看 */
+            --text-main: #1e293b;
+            --text-muted: #536477;
+            --border: #bac7d5;         /* 莫兰迪低对比边框 */
         }
-        .quote { font-style: italic; color: #666; margin-top: 0; font-size: 16px; }
 
-        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .analysis-card { background: #eef5ff; border-left: 5px solid var(--primary-color); border-radius: 8px; padding: 15px 20px; margin-bottom: 20px; }
-        .analysis-card h3 { margin-top: 0; color: #2c5282; font-size: 18px; }
-        .analysis-card ul { margin: 0; padding-left: 20px; }
-        .analysis-card li { margin-bottom: 10px; line-height: 1.5; font-size: 14px; color: #4a5568; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 12px;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        .chart-container { position: relative; height: 350px; width: 100%; }
-        .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
-        button { padding: 8px 14px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); border-radius: 20px; cursor: pointer; transition: 0.3s; font-size: 14px; }
-        button.active { background: var(--primary-color); color: white; }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding-bottom: 24px;
+        }
+
+        /* 顶部 Banner 区域：居中、精简压低上下背景留白 */
+        .banner-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #f59e0b 100%);
+            color: #ffffff;
+        }
+        .banner-media {
+            position: relative;
+            width: 100%;
+            min-height: 84px;
+            max-height: 110px;
+            overflow: hidden;
+        }
+        .banner-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center bottom;
+            display: none;
+        }
+        .banner-placeholder-art {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px 16px;
+            box-sizing: border-box;
+            background: radial-gradient(circle at 85% 20%, rgba(254, 215, 170, 0.35) 0%, transparent 50%),
+                        linear-gradient(135deg, #1e3a8a 0%, #1e40af 45%, #ca8a04 100%);
+        }
+        .banner-title {
+            margin: 0 0 3px 0;
+            font-size: clamp(18px, 4.5vw, 24px);
+            font-weight: 800;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+        .banner-motto {
+            margin: 0;
+            font-size: clamp(12px, 2.8vw, 13.5px);
+            opacity: 0.92;
+            font-style: italic;
+            text-align: center;
+        }
+
+        /* 卡片容器 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid var(--border);
+            margin-bottom: 14px;
+        }
+
+        /* 统一标题：上下排版 */
+        .card-header-stacked {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+        }
+        .card-header-row {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .card-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .card-subtitle {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* 最新考情动态复盘专用排版 */
+        .review-card {
+            border-left: 4px solid var(--primary);
+            background: var(--card-bg);
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .kpi-box {
+            background: var(--card-inner);
+            border-radius: 8px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+        }
+        .kpi-label {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+        .kpi-val {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+        .kpi-sub {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .diff-up { color: #16a34a; }
+        .diff-down { color: #dc2626; }
+        .diff-flat { color: var(--text-muted); }
+
+        /* 考情说明区域：支持单科换行与高对比度动态色彩 */
+        .eval-section {
+            background: var(--card-inner);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .eval-group {
+            margin-bottom: 10px;
+        }
+        .eval-group:last-child { margin-bottom: 0; }
+        .eval-group-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
         
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-        th, td { padding: 10px 4px; border-bottom: 1px solid #eee; text-align: center; }
-        th { background-color: #f8f9fa; }
-        @media (max-width: 600px) { .chart-container { height: 280px; } th, td { font-size: 11px; } }
+        .eval-sub-item {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            background: var(--card-inner-alt);
+            border: 1px solid var(--border);
+            font-size: 12.5px;
+        }
+        .eval-sub-item:last-child { margin-bottom: 0; }
+
+        /* 状态与涨跌动态标记色 */
+        .color-pr { color: #b45309; font-weight: 700; }
+        .color-up { color: #15803d; font-weight: 700; }
+        .color-down { color: #b91c1c; font-weight: 700; }
+        .color-steady { color: #334155; }
+        .badge-pr { background: #eedcb5; color: #7c4c06; border: 1px solid #dcbe8a; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-right: 6px; }
+        .badge-up { background: #cce3d7; color: #1b523c; border: 1px solid #afd0c0; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-right: 6px; }
+        .badge-down { background: #eccfcf; color: #7d2626; border: 1px solid #dba9a9; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-right: 6px; }
+        .badge-steady { background: #cbd7e2; color: #3a4b5d; border: 1px solid #b7c6d4; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-right: 6px; }
+
+        /* 图表控制台 */
+        .chart-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .pill-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+        .pill-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 3px;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+        .pill-btn {
+            padding: 4px 9px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: var(--card-inner);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pill-btn:hover { background: #c2cfdd; }
+        .pill-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+        /* 图表说明横向通栏贴紧图表上方 */
+        .chart-notice-banner {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: var(--card-inner);
+            border-left: 3px solid var(--primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .chart-notice-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.4;
+        }
+        .chart-notice-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* 备注卡片 */
+        .notes-card { border-left: 4px solid #0ea5e9; }
+        .notes-view-content {
+            font-size: 13.5px;
+            line-height: 1.7;
+            color: #334155;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 36px;
+        }
+        .notes-edit-area {
+            display: none;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .notes-textarea {
+            width: 100%;
+            min-height: 110px;
+            padding: 10px;
+            font-size: 13px;
+            line-height: 1.6;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            background: var(--card-inner-alt);
+            color: var(--text-main);
+        }
+        .notes-textarea:focus { border-color: var(--primary); }
+        .notes-edit-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        /* 成绩数据表格：手机竖屏严格自适应无横向滚动 */
+        .table-wrap {
+            width: 100%;
+            overflow-x: hidden;
+        }
+        table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 11px;
+            background: var(--card-bg);
+        }
+        th, td {
+            padding: 6px 1px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            vertical-align: middle;
+            word-break: normal;
+        }
+        th {
+            background-color: var(--card-inner);
+            color: #334155;
+            font-weight: 700;
+            font-size: 11px;
+            border-bottom: 1px solid var(--border);
+        }
+        /* 日期列加宽并强制不折行，消除各浏览器字体宽度差异引起的断行 */
+        th:nth-child(1), td:nth-child(1) {
+            width: 17.5%;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #334155;
+            white-space: nowrap !important;
+            letter-spacing: -0.3px;
+            font-variant-numeric: tabular-nums;
+        }
+        th:nth-child(n+2), td:nth-child(n+2) { width: 11.78%; }
+        
+        tr:hover td { background-color: var(--card-inner-alt); }
+        .score-num { font-weight: 700; font-size: 11.5px; color: var(--text-main); display: block; line-height: 1.15; }
+        .rank-num { font-size: 10px; color: var(--text-muted); display: block; line-height: 1.15; margin-top: 1px; }
+        .pr-star {
+            color: var(--star-gold);
+            font-weight: bold;
+            font-size: 10px;
+            margin-left: 1px;
+        }
+
+        /* 表格管理模式下放大的操作按钮 */
+        .tbl-manage-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            margin-top: 3px;
+        }
+        .tbl-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 22px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: var(--card-inner);
+            cursor: pointer;
+            line-height: 1;
+        }
+        .tbl-icon-btn:active { background: var(--card-inner-alt); }
+        .tbl-icon-btn.del { border-color: #fecaca; }
+
+        /* 底部工具条：3个按钮均有鲜明色彩，单行自适应平铺 */
+        .toolbar-bottom {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 8px;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            background: var(--card-bg);
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            padding: 8px 6px;
+            font-size: 12.5px;
+            font-weight: 600;
+            border-radius: 7px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+            white-space: nowrap;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .toolbar-bottom .btn {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 4px;
+            letter-spacing: -0.2px;
+        }
+
+        /* 按钮功能语义色彩定义 */
+        /* 1. 录入新考试：高饱和学术蓝 (Creation/Input) */
+        .btn-entry {
+            background-color: #2563eb !important;
+            border-color: #1d4ed8 !important;
+            color: #ffffff !important;
+        }
+        .btn-entry:hover {
+            background-color: #1d4ed8 !important;
+        }
+
+        /* 2. 成绩管理：沉稳石板灰蓝 (Admin/Config)，激活时变为警示暖橙 */
+        .btn-manage {
+            background-color: #475569 !important;
+            border-color: #334155 !important;
+            color: #ffffff !important;
+        }
+        .btn-manage:hover {
+            background-color: #334155 !important;
+        }
+        .btn-manage.active {
+            background-color: #d97706 !important;
+            border-color: #b45309 !important;
+            color: #ffffff !important;
+        }
+
+        /* 3. 导出HTML备份：安全稳健翡翠绿 (Safe State/Export) */
+        .btn-backup {
+            background-color: #059669 !important;
+            border-color: #047857 !important;
+            color: #ffffff !important;
+        }
+        .btn-backup:hover {
+            background-color: #047857 !important;
+        }
+
+        .btn-sm { padding: 3px 8px; font-size: 12px; }
+
+        /* 弹窗样式：严格自适应，防止左右横拉 */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 10px;
+        }
+        .modal-box {
+            background: var(--card-bg);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            padding: 14px;
+            margin: 0 auto;
+        }
+        .modal-title {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .form-group.full { grid-column: span 2; }
+        .form-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .form-input {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            font-size: 13px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+            background: var(--card-inner-alt);
+            color: var(--text-main);
+        }
+        .form-input:focus { border-color: var(--primary); }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 6px; }
+            .card { padding: 10px 10px; border-radius: 10px; }
+            .chart-container { height: 250px; }
+            .score-num { font-size: 11px; }
+            .rank-num { font-size: 9.5px; }
+            .kpi-val { font-size: 17px; }
+            .toolbar-bottom { gap: 6px; padding: 8px 6px; }
+            .toolbar-bottom .btn { font-size: 11.5px; padding: 7px 3px; }
+            th:nth-child(1), td:nth-child(1) { width: 18%; font-size: 10px; }
+            th:nth-child(n+2), td:nth-child(n+2) { width: 11.71%; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>🌟 王子九悦的学习轨迹</h1>
-        <p class="quote">“越过重重山岗，终将遇见星辰。”</p>
-    </header>
-
-    <div class="card">
-        <h3>📈 排名趋势 (向上代表进步)</h3>
-        <div class="controls" id="btnGroup">
-            <button class="active" onclick="updateChart('总分')">总分</button>
-            <button onclick="updateChart('语文')">语文</button>
-            <button onclick="updateChart('数学')">数学</button>
-            <button onclick="updateChart('英语')">英语</button>
-            <button onclick="updateChart('物理')">物理</button>
-            <button onclick="updateChart('化学')">化学</button>
-            <button onclick="updateChart('地理')">地理</button>
+<div class="container" id="reportArea">
+    <!-- 顶部 Banner 区域：标题与格言居中，精简压低高度 -->
+    <div class="banner-wrapper">
+        <div class="banner-media">
+            <img id="bannerImg" class="banner-img" alt="成长轨迹背景图">
+            <div class="banner-placeholder-art" id="bannerPlaceholder">
+                <div style="width: 100%; text-align: center;">
+                    <h1 class="banner-title">🌟 王子九悦的学习轨迹</h1>
+                    <p class="banner-motto">“越过重重山岗，终将遇见星辰。”</p>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <!-- 1. 最新考情动态复盘 -->
+    <div class="card review-card" id="latestReviewCard">
+        <div class="card-header-stacked">
+            <h3 class="card-title">🚩 最新考情动态复盘</h3>
+            <span class="card-subtitle" id="reviewExamDate">基于最新一次考试</span>
+        </div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="eval-section" id="evalDetails"></div>
+    </div>
+
+    <!-- 2. 走势与分析图表卡片 -->
+    <div class="card">
+        <div class="card-header-stacked">
+            <h3 class="card-title">📈 排名走势与分析</h3>
+            <span class="card-subtitle">多维度学情图表（支持单科趋势、优势度与稳定性深度剖析）</span>
+        </div>
+
+        <div class="chart-controls">
+            <!-- 时间快捷筛选：包含最近10次 -->
+            <div class="pill-group" id="timeFilterGroup">
+                <span class="pill-label">区间:</span>
+                <button class="pill-btn active" onclick="applyTimeFilter('全部')">全部</button>
+                <button class="pill-btn" onclick="applyTimeFilter('高一')">高一</button>
+                <button class="pill-btn" onclick="applyTimeFilter('高二')">高二</button>
+                <button class="pill-btn" onclick="applyTimeFilter('高二至今')">高二至今</button>
+                <button class="pill-btn" onclick="applyTimeFilter('高三')">高三</button>
+                <button class="pill-btn" onclick="applyTimeFilter('最近3次')">最近3次</button>
+                <button class="pill-btn" onclick="applyTimeFilter('最近5次')">最近5次</button>
+                <button class="pill-btn" onclick="applyTimeFilter('最近10次')">最近10次</button>
+            </div>
+
+            <!-- 分析维度筛选 -->
+            <div class="pill-group" id="dimensionFilterGroup">
+                <span class="pill-label">维度:</span>
+                <button class="pill-btn active" onclick="switchDimension('总分')">总分</button>
+                <button class="pill-btn" onclick="switchDimension('语文')">语文</button>
+                <button class="pill-btn" onclick="switchDimension('数学')">数学</button>
+                <button class="pill-btn" onclick="switchDimension('英语')">英语</button>
+                <button class="pill-btn" onclick="switchDimension('物理')">物理</button>
+                <button class="pill-btn" onclick="switchDimension('化学')">化学</button>
+                <button class="pill-btn" onclick="switchDimension('地理')">地理</button>
+                <button class="pill-btn" onclick="switchDimension('科目优势')">科目优势</button>
+                <button class="pill-btn" onclick="switchDimension('科目稳定性')">科目稳定性</button>
+            </div>
+        </div>
+
+        <!-- 说明文字紧贴在图表画布正上方 -->
+        <div class="chart-notice-banner" id="chartNoticeBanner">
+            <div class="chart-notice-title" id="currentSubjectDesc">总分 · 排名走势</div>
+            <div class="chart-notice-sub" id="currentSubjectSub">向上代表名次进步 | 理科总基数 1268人</div>
+        </div>
+
         <div class="chart-container">
             <canvas id="scoreChart"></canvas>
         </div>
     </div>
 
-    <div class="analysis-card">
-        <h3>💡 学情深度洞察</h3>
-        <ul>
-            <li><strong>整体势头：</strong>高一至今，校排名呈现明显的“波动中爬升”态势。即便遇到阶段性挑战，也能在下一次考试中强势反弹，展现出极强的抗压能力。</li>
-            <li><strong>王牌领航：</strong>英语（校排第6）与地理（校排第11）已构成坚实的“护城河”。这两科不仅是得分核心，更是冲击顶尖名次的底气。</li>
-            <li><strong>韧劲逆袭：</strong>物理与数学排名持续大幅进步，物理从最初的 700+ 名杀回前 150 名，说明逻辑思维训练已见成效，理科潜力巨大。</li>
-            <li><strong>关键突破点：</strong>目前进入全校前 100 名的最后一块拼图是“语文的稳定性”。若能锁定波动原因并补齐短板，整体位次将迎来质的飞跃。</li>
-        </ul>
+    <!-- 3. 备注卡片 -->
+    <div class="card notes-card">
+        <div class="card-header-stacked" style="width: 100%;">
+            <div class="card-header-row">
+                <h3 class="card-title">📝 备注</h3>
+                <button class="btn btn-sm" id="btnEditNotes" onclick="toggleEditNotes()" style="background:var(--card-inner); color:var(--text-main); border:1px solid var(--border);">✏️ 编辑</button>
+            </div>
+            <span class="card-subtitle" id="notesUpdateTime"></span>
+        </div>
+        <div class="notes-view-content" id="notesContent">此处可手动填写备注。</div>
+        <div class="notes-edit-area" id="notesEditArea">
+            <textarea class="notes-textarea" id="notesInput" placeholder="此处可手动填写备注..."></textarea>
+            <div class="notes-edit-footer">
+                <button class="btn btn-sm" onclick="insertCurrentTimestamp()" style="background:var(--card-inner); color:var(--text-main); border:1px solid var(--border);">📅 [+ 插入当前日期]</button>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-sm" onclick="toggleEditNotes(false)" style="background:var(--card-inner); color:var(--text-muted); border:1px solid var(--border);">取消</button>
+                    <button class="btn btn-sm btn-entry" onclick="saveNotes()">保存</button>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <!-- 4. 成绩档案明细表：说明中的星号与表格内星号同色 -->
     <div class="card">
-        <h3>📊 成绩档案明细 (原始分/校排名)</h3>
-        <div style="overflow-x: auto;">
+        <div class="card-header-stacked">
+            <h3 class="card-title">📊 历次成绩档案 (分 / 校排)</h3>
+            <span class="card-subtitle">注：<span class="pr-star" style="font-size:11.5px;">★</span> 代表该科个人历史最好成绩</span>
+        </div>
+        <div class="table-wrap">
             <table id="dataTable">
                 <thead>
                     <tr>
                         <th>日期</th>
-                        <th>总分/排名</th>
+                        <th>总分</th>
                         <th>语文</th>
                         <th>数学</th>
                         <th>英语</th>
@@ -93,11 +673,115 @@
             </table>
         </div>
     </div>
+
+        <!-- 5. 底部工具条：3个按钮均有明确属性色彩，单行自适应对齐 -->
+    <div class="toolbar-bottom">
+        <button class="btn btn-entry" onclick="openAddModal()">➕ 录入新考试</button>
+        <button class="btn btn-manage" id="btnManage" onclick="toggleManageMode()">🛠️ 成绩管理</button>
+        <button class="btn btn-backup" onclick="saveToLocalHtmlFile()">💾 导出备份</button>
+    </div>
+
+    <!-- 6. 使用指南说明卡片（置于页面最底部） -->
+    <div class="card" style="background: var(--card-inner); border: 1px dashed var(--border); margin-top: 12px; padding: 12px 14px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-weight: 700; font-size: 13px; color: var(--text-main);">
+            <span>📖 使用小说明</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+            <div>• <strong>自动保存</strong>：手动录入或修改的成绩自动保存在当前浏览器中，只要不清理缓存，下次打开依然是最新数据。</div>
+            <div>• <strong>导出与微信分享</strong>：点击【💾 导出HTML备份】可下载更新后的网页文件，通过微信等直接发给家长或孩子，对方点开即看。</div>
+            <div>• <strong>换设备查看</strong>：若更换新手机或电脑，将备份文件发送至新设备并用浏览器打开即可无缝继承全部记录。</div>
+        </div>
+    </div>
+</div>
+
+<!-- 录入/修改数据模态弹窗 -->
+<div class="modal-overlay" id="examModal">
+    <div class="modal-box">
+        <h3 class="modal-title" id="modalTitle">➕ 录入新考试成绩</h3>
+        <input type="hidden" id="editIndex" value="-1">
+        <div class="form-grid">
+            <div class="form-group full">
+                <label class="form-label">考试日期/标识 (如 26.05.15)</label>
+                <input type="text" class="form-input" id="inputTime" placeholder="格式例: 26.05.15">
+            </div>
+            <div class="form-group">
+                <label class="form-label">总分 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_总分">
+            </div>
+            <div class="form-group">
+                <label class="form-label">总分 校排名</label>
+                <input type="number" class="form-input" id="inputRank_总分">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">语文 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_语文">
+            </div>
+            <div class="form-group">
+                <label class="form-label">语文 校排名</label>
+                <input type="number" class="form-input" id="inputRank_语文">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">数学 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_数学">
+            </div>
+            <div class="form-group">
+                <label class="form-label">数学 校排名</label>
+                <input type="number" class="form-input" id="inputRank_数学">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">英语 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_英语">
+            </div>
+            <div class="form-group">
+                <label class="form-label">英语 校排名</label>
+                <input type="number" class="form-input" id="inputRank_英语">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">物理 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_物理">
+            </div>
+            <div class="form-group">
+                <label class="form-label">物理 校排名</label>
+                <input type="number" class="form-input" id="inputRank_物理">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">化学 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_化学">
+            </div>
+            <div class="form-group">
+                <label class="form-label">化学 校排名</label>
+                <input type="number" class="form-input" id="inputRank_化学">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">地理 分数</label>
+                <input type="number" step="0.5" class="form-input" id="inputScore_地理">
+            </div>
+            <div class="form-group">
+                <label class="form-label">地理 校排名</label>
+                <input type="number" class="form-input" id="inputRank_地理">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn" onclick="closeModal()" style="background:var(--card-inner); color:var(--text-main); border:1px solid var(--border);">取消</button>
+            <button class="btn btn-entry" onclick="saveExamData()">保存数据</button>
+        </div>
+    </div>
 </div>
 
 <script>
-    // 再次手动校对 12 次完整数据
-    const rawData = [
+    const COHORTS = {
+        '语数英': 1693,
+        '物化总分': 1268,
+        '地理选科': 360
+    };
+
+    const defaultRawData = [
         {"time": "24.10", "总分": [510, 413], "语文": [90, 572], "数学": [111, 408], "英语": [109, 442], "物理": [52, 793], "化学": [73, 557], "地理": [75, 170]},
         {"time": "24.11", "总分": [447, 242], "语文": [91, 111], "数学": [81, 335], "英语": [86, 488], "物理": [65, 176], "化学": [60, 447], "地理": [64, 473]},
         {"time": "24.12.4", "总分": [456, 356], "语文": [97, null], "数学": [65, null], "英语": [124, null], "物理": [45, null], "化学": [59, null], "地理": [66, null]},
@@ -109,44 +793,515 @@
         {"time": "25.12.12", "总分": [508, 179], "语文": [106, 178], "数学": [77, 616], "英语": [140, 6], "物理": [68, 101], "化学": [53, 410], "地理": [64, 53]},
         {"time": "25.12.24", "总分": [499, 103], "语文": [103.5, null], "数学": [107, null], "英语": [124.5, null], "物理": [64, null], "化学": [36, null], "地理": [64, null]},
         {"time": "26.01", "总分": [528, 281], "语文": [99, 881], "数学": [120, 221], "英语": [117, 202], "物理": [70, 272], "化学": [53, 768], "地理": [69, 58]},
-        {"time": "26.04.16", "总分": [565, 138], "语文": [111, 406], "数学": [107, 235], "外语": [122, 112], "物理": [76, 148], "化学": [71, 437], "地理": [78, 11]}
+        {"time": "26.04.16", "总分": [565, 138], "语文": [111, 406], "数学": [107, 235], "英语": [122, 112], "物理": [76, 148], "化学": [71, 437], "地理": [78, 11]},
+        {"time": "26.06.25", "总分": [519, 183], "语文": [112, 65], "数学": [87, 639], "英语": [121, 94], "物理": [67, 184], "化学": [59, 581], "地理": [73, 3]},
+        {"time": "26.07.09", "总分": [513, 269], "语文": [99, 435], "数学": [82, 685], "英语": [108, 257], "物理": [56, 293], "化学": [82, 281], "地理": [86, 76]},
+        {"time": "26.09.11", "总分": [512, 163], "语文": [108, 142], "数学": [72, 453], "英语": [126, 44], "物理": [65, 243], "化学": [77, 293], "地理": [64, 114]}
     ];
 
-    const ctx = document.getElementById('scoreChart').getContext('2d');
-    let myChart;
+    const defaultNotes = "此处可手动填写备注。";
 
-    function initChart() {
+    let examData = [];
+    let currentNotes = "";
+    let notesLastUpdated = "";
+    let currentDimension = '总分';
+    let currentTimeFilter = '全部';
+    let isManageMode = false;
+    let myChart = null;
+
+    function parseExamDate(str) {
+        const parts = str.split('.').map(p => parseInt(p, 10));
+        let y = parts[0] < 100 ? 2000 + parts[0] : parts[0];
+        let m = (parts[1] || 1) - 1;
+        let d = parts[2] || 1;
+        return new Date(y, m, d);
+    }
+
+    function isPostJuly25(str) {
+        const dt = parseExamDate(str);
+        return dt >= new Date(2025, 6, 1);
+    }
+
+    function getCohortSize(subject, timeStr) {
+        if (['语文', '数学', '英语'].includes(subject)) return COHORTS['语数英'];
+        if (['物理', '化学', '总分'].includes(subject)) return COHORTS['物化总分'];
+        if (subject === '地理') {
+            return isPostJuly25(timeStr) ? COHORTS['地理选科'] : COHORTS['物化总分'];
+        }
+        return COHORTS['物化总分'];
+    }
+
+    function initData() {
+        const savedData = localStorage.getItem('wangzi_exam_data_v8');
+        if (savedData) {
+            try {
+                examData = JSON.parse(savedData);
+            } catch (e) {
+                examData = JSON.parse(JSON.stringify(defaultRawData));
+            }
+        } else {
+            examData = JSON.parse(JSON.stringify(defaultRawData));
+        }
+
+        const savedNotes = localStorage.getItem('wangzi_notes_content_v8');
+        currentNotes = savedNotes !== null ? savedNotes : defaultNotes;
+        notesLastUpdated = localStorage.getItem('wangzi_notes_time_v8') || "";
+    }
+
+    function persistData() {
+        localStorage.setItem('wangzi_exam_data_v8', JSON.stringify(examData));
+    }
+
+    function calcHistoricalPR() {
+        const prMap = {};
+        const subjects = ['总分', '语文', '数学', '英语', '物理', '化学', '地理'];
+        subjects.forEach(sub => {
+            let minRank = Infinity;
+            examData.forEach(item => {
+                if (sub === '地理' && !isPostJuly25(item.time)) return;
+                const rec = item[sub];
+                if (rec && rec[1] !== null && rec[1] !== undefined && rec[1] > 0) {
+                    if (rec[1] < minRank) minRank = rec[1];
+                }
+            });
+            prMap[sub] = minRank === Infinity ? null : minRank;
+        });
+        return prMap;
+    }
+
+    function renderLatestReview() {
+        if (examData.length === 0) {
+            document.getElementById('reviewExamDate').innerText = '暂无考试记录';
+            document.getElementById('kpiGrid').innerHTML = '<div style="grid-column:span 2; color:#64748b; text-align:center; padding:12px;">暂无成绩数据，请点击下方录入</div>';
+            document.getElementById('evalDetails').innerHTML = '<div style="color:#64748b; text-align:center;">暂无分析内容</div>';
+            return;
+        }
+        
+        const latestIdx = examData.length - 1;
+        const latest = examData[latestIdx];
+        const prev = examData.length > 1 ? examData[latestIdx - 1] : null;
+        const baselinePool = examData.slice(Math.max(0, latestIdx - 3), latestIdx);
+
+        document.getElementById('reviewExamDate').innerText = `基于最近一次（${latest.time}）考试数据分析`;
+
+        // 1. 最新总分排位 KPI
+        const curRank = latest.总分 ? latest.总分[1] : null;
+        let deltaPrevText = "首次记录";
+        let deltaPrevClass = "diff-flat";
+
+        if (curRank && prev && prev.总分 && prev.总分[1]) {
+            const diff = prev.总分[1] - curRank;
+            if (diff > 0) {
+                deltaPrevText = `较上次 ↑${diff} 名`;
+                deltaPrevClass = "diff-up";
+            } else if (diff < 0) {
+                deltaPrevText = `较上次 ↓${Math.abs(diff)} 名`;
+                deltaPrevClass = "diff-down";
+            } else {
+                deltaPrevText = `较上次持平`;
+                deltaPrevClass = "diff-flat";
+            }
+        }
+
+        // 2. 常态走势比对 (近3次均值)
+        let baselineDiffText = "-";
+        let statusBadge = `<span class="badge-steady">发挥平稳</span>`;
+        if (curRank && baselinePool.length > 0) {
+            const validRanks = baselinePool.map(d => d.总分 ? d.总分[1] : null).filter(r => r !== null);
+            if (validRanks.length > 0) {
+                const avgRank = validRanks.reduce((a,b)=>a+b, 0) / validRanks.length;
+                const bDiff = Math.round(avgRank - curRank);
+                if (bDiff >= 25) statusBadge = `<span class="badge-up">显著冲刺 🚀</span>`;
+                else if (bDiff <= -25) statusBadge = `<span class="badge-down">阶段承压 💡</span>`;
+
+                if (bDiff > 0) baselineDiffText = `较常态均值 ↑${bDiff} 名`;
+                else if (bDiff < 0) baselineDiffText = `较常态均值 ↓${Math.abs(bDiff)} 名`;
+                else baselineDiffText = `与常态均值持平`;
+            }
+        }
+
+        document.getElementById('kpiGrid').innerHTML = `
+            <div class="kpi-box">
+                <div class="kpi-label">最新总分排位</div>
+                <div class="kpi-val">${curRank ? curRank + ' <span style="font-size:12px; font-weight:normal; color:#64748b;">名</span>' : '-'}</div>
+                <div class="kpi-sub ${deltaPrevClass}">${deltaPrevText}</div>
+            </div>
+            <div class="kpi-box">
+                <div class="kpi-label">常态走势比对 (近3次均值)</div>
+                <div class="kpi-val" style="font-size:14px; font-weight:700; padding-top:2px;">${statusBadge}</div>
+                <div class="kpi-sub diff-flat">${baselineDiffText}</div>
+            </div>
+        `;
+
+        // 3. 各学科详细考情：单科换行、动态颜色突出
+        const prMap = calcHistoricalPR();
+        const subjects = ['总分', '语文', '数学', '英语', '物理', '化学', '地理'];
+        const listPR = [];
+        const listUp = [];
+        const listDown = [];
+        const listSteady = [];
+
+        subjects.forEach(sub => {
+            const curRec = latest[sub];
+            if (!curRec || curRec[1] === null || curRec[1] === undefined) return;
+            const rank = curRec[1];
+            const cohort = getCohortSize(sub, latest.time);
+            const curPct = (rank / cohort) * 100;
+
+            let prevRank = null;
+            let prevCohort = cohort;
+            for (let i = latestIdx - 1; i >= 0; i--) {
+                const rec = examData[i][sub];
+                if (rec && rec[1] !== null && rec[1] !== undefined && rec[1] > 0) {
+                    prevRank = rec[1];
+                    prevCohort = getCohortSize(sub, examData[i].time);
+                    break;
+                }
+            }
+
+            const isGeoPre = (sub === '地理' && !isPostJuly25(latest.time));
+            const isPR = (!isGeoPre && prMap[sub] !== null && rank === prMap[sub]);
+
+            if (isPR) {
+                listPR.push(`
+                    <div class="eval-sub-item">
+                        <span class="badge-pr">★ 历史最佳</span>
+                        <strong class="color-pr">${sub}</strong>：全校第 <span class="color-pr">${rank}</span> 名（居全校前 ${curPct.toFixed(1)}%），创历史最高纪录！
+                    </div>
+                `);
+                return;
+            }
+
+            if (prevRank !== null) {
+                const prevPct = (prevRank / prevCohort) * 100;
+                const deltaRank = prevRank - rank;
+                const deltaPct = prevPct - curPct;
+
+                const isSignificantUp = deltaPct >= 3.5 || (sub === '地理' ? deltaRank >= 20 : deltaRank >= 45);
+                const isSignificantDown = deltaPct <= -3.5 || (sub === '地理' ? deltaRank <= -20 : deltaRank <= -45);
+
+                if (isSignificantUp) {
+                    listUp.push(`
+                        <div class="eval-sub-item">
+                            <span class="badge-up">显著进步</span>
+                            <strong class="color-up">${sub}</strong>：较上次提升 <span class="color-up">↑${deltaRank}</span> 名（从第${prevRank}名升至第${rank}名，前移至前${curPct.toFixed(1)}%）
+                        </div>
+                    `);
+                } else if (isSignificantDown) {
+                    listDown.push(`
+                        <div class="eval-sub-item">
+                            <span class="badge-down">波动起伏</span>
+                            <strong class="color-down">${sub}</strong>：较上次回落 <span class="color-down">↓${Math.abs(deltaRank)}</span> 名（从第${prevRank}名降至第${rank}名），建议考后专项归因复盘
+                        </div>
+                    `);
+                } else {
+                    const diffText = deltaRank > 0 ? `微升${deltaRank}名` : (deltaRank < 0 ? `微降${Math.abs(deltaRank)}名` : `持平`);
+                    listSteady.push(`
+                        <div class="eval-sub-item">
+                            <span class="badge-steady">平稳发挥</span>
+                            <strong class="color-steady">${sub}</strong>：全校第 ${rank} 名（较前次${diffText}，居常态区间）
+                        </div>
+                    `);
+                }
+            } else {
+                listSteady.push(`
+                    <div class="eval-sub-item">
+                        <span class="badge-steady">单次记录</span>
+                        <strong class="color-steady">${sub}</strong>：全校第 ${rank} 名
+                    </div>
+                `);
+            }
+        });
+
+        let evalHtml = '';
+        if (listPR.length > 0) {
+            evalHtml += `<div class="eval-group"><div class="eval-group-title color-pr">🏆 突破极限学科</div>${listPR.join('')}</div>`;
+        }
+        if (listUp.length > 0) {
+            evalHtml += `<div class="eval-group"><div class="eval-group-title color-up">🚀 强劲上升学科</div>${listUp.join('')}</div>`;
+        }
+        if (listDown.length > 0) {
+            evalHtml += `<div class="eval-group"><div class="eval-group-title color-down">⚠️ 重点关注学科</div>${listDown.join('')}</div>`;
+        }
+        if (listSteady.length > 0) {
+            evalHtml += `<div class="eval-group"><div class="eval-group-title color-steady">🛡️ 发挥平稳学科</div>${listSteady.join('')}</div>`;
+        }
+
+        document.getElementById('evalDetails').innerHTML = evalHtml;
+    }
+
+    function getFilteredData() {
+        if (currentTimeFilter === '全部') return examData;
+        if (currentTimeFilter === '最近3次') return examData.slice(Math.max(0, examData.length - 3));
+        if (currentTimeFilter === '最近5次') return examData.slice(Math.max(0, examData.length - 5));
+        if (currentTimeFilter === '最近10次') return examData.slice(Math.max(0, examData.length - 10));
+
+        return examData.filter(d => {
+            const dt = parseExamDate(d.time);
+            if (currentTimeFilter === '高一') return dt < new Date(2025, 6, 1);
+            if (currentTimeFilter === '高二') return dt >= new Date(2025, 6, 1) && dt < new Date(2026, 6, 1);
+            if (currentTimeFilter === '高二至今') return dt >= new Date(2025, 6, 1);
+            if (currentTimeFilter === '高三') return dt >= new Date(2026, 6, 1);
+            return true;
+        });
+    }
+
+    function initOrUpdateChart() {
+        const filtered = getFilteredData();
+        const noticeTitleEl = document.getElementById('currentSubjectDesc');
+        const noticeSubEl = document.getElementById('currentSubjectSub');
+        const subjects = ['语文', '数学', '英语', '物理', '化学', '地理'];
+
+        if (myChart) {
+            myChart.destroy();
+            myChart = null;
+        }
+
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+
+        // 视图 1：科目优势排名
+        if (currentDimension === '科目优势') {
+            noticeTitleEl.innerText = `各学科优势指数排行 (柱子越高代表超越全校考生越多、优势越突出)`;
+            noticeSubEl.innerText = `纵轴: 超越考生比例 0%~100% (按位次前百分比换算，由强到弱降序排列)`;
+
+            const advantageList = subjects.map(sub => {
+                const validPcts = [];
+                filtered.forEach(d => {
+                    if (sub === '地理' && !isPostJuly25(d.time)) return;
+                    const rec = d[sub];
+                    if (rec && rec[1]) {
+                        const cohort = getCohortSize(sub, d.time);
+                        validPcts.push((rec[1] / cohort) * 100);
+                    }
+                });
+                if (validPcts.length === 0) return null;
+                const avgPct = validPcts.reduce((a,b)=>a+b, 0) / validPcts.length;
+                const beatPct = Math.max(0, 100 - avgPct);
+                return { sub, avgPct, beatPct };
+            }).filter(Boolean);
+
+            advantageList.sort((a,b) => b.beatPct - a.beatPct);
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: advantageList.map(d => `${d.sub} (超${d.beatPct.toFixed(1)}%)`),
+                    datasets: [{
+                        label: '超越考生比例 (%)',
+                        data: advantageList.map(d => d.beatPct.toFixed(1)),
+                        backgroundColor: '#2563eb',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            title: { display: false },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 },
+                                callback: (v) => v + '%'
+                            }
+                        },
+                        x: { ticks: { color: '#334155', font: { size: 11, weight: 'bold' } } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const item = advantageList[ctx.dataIndex];
+                                    return [
+                                        ` 优势指数: 超越全校 ${item.beatPct.toFixed(1)}% 考生`,
+                                        ` 平均位次处于全校前 ${item.avgPct.toFixed(1)}%`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            return;
+        }
+
+        // 视图 2：科目稳定性排名
+        if (currentDimension === '科目稳定性') {
+            noticeTitleEl.innerText = `各学科稳定指数排行 (柱子越高代表考试发挥越稳定、抗波动能力越强)`;
+            noticeSubEl.innerText = `纵轴: 稳定指数 0~100分 (满分100，排位离散波动每1%扣5分，由稳到动降序排列)`;
+
+            const stabilityList = subjects.map(sub => {
+                const validPcts = [];
+                filtered.forEach(d => {
+                    if (sub === '地理' && !isPostJuly25(d.time)) return;
+                    const rec = d[sub];
+                    if (rec && rec[1]) {
+                        const cohort = getCohortSize(sub, d.time);
+                        validPcts.push((rec[1] / cohort) * 100);
+                    }
+                });
+                if (validPcts.length < 2) return null;
+                const mean = validPcts.reduce((a,b)=>a+b, 0) / validPcts.length;
+                const variance = validPcts.reduce((a,b)=> a + Math.pow(b - mean, 2), 0) / validPcts.length;
+                const sigma = Math.sqrt(variance);
+                const stabilityScore = Math.max(10, Math.min(100, Math.round(100 - sigma * 5)));
+                return { sub, sigma, stabilityScore };
+            }).filter(Boolean);
+
+            stabilityList.sort((a,b) => b.stabilityScore - a.stabilityScore);
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: stabilityList.map(d => `${d.sub} (${d.stabilityScore}分)`),
+                    datasets: [{
+                        label: '稳定指数 (分)',
+                        data: stabilityList.map(d => d.stabilityScore),
+                        backgroundColor: '#16a34a',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            title: { display: false },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 },
+                                callback: (v) => v + '分'
+                            }
+                        },
+                        x: { ticks: { color: '#334155', font: { size: 11, weight: 'bold' } } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const item = stabilityList[ctx.dataIndex];
+                                    return [
+                                        ` 稳定得分: ${item.stabilityScore} 分`,
+                                        ` 历史排位波动仅: ±${item.sigma.toFixed(1)}%`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            return;
+        }
+
+        // 视图 3：单科及总分历史走势
+        const prMap = calcHistoricalPR();
+        const labels = filtered.map(d => d.time);
+        const ranks = filtered.map(d => {
+            const rec = d[currentDimension];
+            return (rec && rec[1] !== null && rec[1] !== undefined) ? rec[1] : null;
+        });
+
+        const pointRadiusList = [];
+        const pointBgList = [];
+        const pointBorderList = [];
+
+        filtered.forEach(d => {
+            const rec = d[currentDimension];
+            const r = rec ? rec[1] : null;
+            const isGeoPre = (currentDimension === '地理' && !isPostJuly25(d.time));
+            const isPR = (!isGeoPre && r !== null && prMap[currentDimension] !== null && r === prMap[currentDimension]);
+
+            if (isPR) {
+                pointRadiusList.push(6);
+                pointBgList.push('#eab308');
+                pointBorderList.push('#ffffff');
+            } else {
+                pointRadiusList.push(3.5);
+                pointBgList.push('#2563eb');
+                pointBorderList.push('#ffffff');
+            }
+        });
+
+        if (currentDimension === '地理') {
+            noticeTitleEl.innerText = `地理 · 全校选科排名走势`;
+            noticeSubEl.innerText = `曲线向上代表名次提升 | 2025.07前全校1268人考，2025.07后物化地选科360人考`;
+        } else if (['语文', '数学', '英语'].includes(currentDimension)) {
+            noticeTitleEl.innerText = `${currentDimension} · 全校统一排名走势`;
+            noticeSubEl.innerText = `曲线向上代表名次提升 | 文理统考总基数 1693人`;
+        } else {
+            noticeTitleEl.innerText = `${currentDimension} · 全校理科排名走势`;
+            noticeSubEl.innerText = `曲线向上代表名次提升 | 理科总基数 1268人`;
+        }
+
         myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: rawData.map(d => d.time),
+                labels: labels,
                 datasets: [{
-                    label: '总分排名',
-                    data: rawData.map(d => d.总分[1]),
-                    borderColor: '#4a90e2',
-                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.3,
+                    label: `${currentDimension} 校排名`,
+                    data: ranks,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                    borderWidth: 2,
+                    tension: 0.25,
                     fill: true,
                     spanGaps: true,
-                    pointRadius: 4
+                    pointRadius: pointRadiusList,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: pointBgList,
+                    pointBorderColor: pointBorderList,
+                    pointBorderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { reverse: true, title: { display: true, text: '全校排名' } }
+                    y: {
+                        reverse: true,
+                        title: { display: false },
+                        grid: { color: '#cbd5e1' },
+                        ticks: {
+                            color: '#64748b',
+                            font: { size: 10 },
+                            callback: (v) => v + '名'
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#64748b', font: { size: 10 } }
+                    }
                 },
                 plugins: {
+                    legend: { display: false },
                     tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        padding: 8,
+                        titleFont: { size: 12 },
+                        bodyFont: { size: 11 },
                         callbacks: {
                             label: (context) => {
-                                let item = rawData[context.dataIndex];
-                                let sub = document.querySelector('button.active').innerText;
-                                // 兼容 26.04 的外语字段
-                                let targetSub = sub === '英语' && !item['英语'] ? '外语' : sub;
-                                return `分数: ${item[targetSub][0]} | 排名: ${item[targetSub][1] || '无排名'}`;
+                                const item = filtered[context.dataIndex];
+                                const subData = item[currentDimension];
+                                if (!subData) return '未参加本次考试';
+                                const score = subData[0];
+                                const rank = subData[1];
+                                if (rank === null) return `得分: ${score} | 暂无全校排名`;
+                                
+                                const cohort = getCohortSize(currentDimension, item.time);
+                                const pct = ((rank / cohort) * 100).toFixed(1);
+                                const isPR = (prMap[currentDimension] === rank && !(currentDimension === '地理' && !isPostJuly25(item.time)));
+                                return [
+                                    `得分: ${score} 分`,
+                                    `校排名: 第 ${rank} 名 / ${cohort}人 (前 ${pct}%)`,
+                                    isPR ? '★ 历史最好成绩' : ''
+                                ].filter(Boolean);
                             }
                         }
                     }
@@ -155,47 +1310,262 @@
         });
     }
 
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && myChart) {
-            myChart.resize();
-            myChart.update();
-        }
-    });
-
-    function updateChart(subject) {
-        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        
-        const chartData = rawData.map(d => {
-            // 特殊处理 26.04 的外语
-            let key = subject === '英语' && !d['英语'] ? '外语' : subject;
-            return d[key] ? d[key][1] : null;
-        });
-
-        myChart.data.datasets[0].data = chartData;
-        myChart.data.datasets[0].label = subject + ' 排名';
-        myChart.update();
-    }
-
-    function fillTable() {
+    function renderTable() {
         const tbody = document.getElementById('tableBody');
-        rawData.forEach(d => {
-            // 处理英语/外语字段
-            const eng = d.英语 || d.外语;
-            tbody.innerHTML += `<tr>
-                <td>${d.time}</td>
-                <td><b>${d.总分[0]}</b><br><small>${d.总分[1] || '-'}</small></td>
-                <td>${d.语文[0]}<br><small>${d.语文[1] || '-'}</small></td>
-                <td>${d.数学[0]}<br><small>${d.数学[1] || '-'}</small></td>
-                <td>${eng[0]}<br><small>${eng[1] || '-'}</small></td>
-                <td>${d.物理[0] || '-'}<br><small>${d.物理[1] || '-'}</small></td>
-                <td>${d.化学[0]}<br><small>${d.化学[1] || '-'}</small></td>
-                <td>${d.地理[0]}<br><small>${d.地理[1] || '-'}</small></td>
-            </tr>`;
+        tbody.innerHTML = '';
+        const prMap = calcHistoricalPR();
+
+        examData.forEach((d, idx) => {
+            const tr = document.createElement('tr');
+            
+            const makeCell = (subKey) => {
+                const rec = d[subKey];
+                if (!rec) return '-';
+                const score = rec[0] !== null ? rec[0] : '-';
+                const rank = rec[1] !== null ? rec[1] : null;
+                
+                let star = '';
+                const isGeoPre = (subKey === '地理' && !isPostJuly25(d.time));
+                if (rank !== null && !isGeoPre && prMap[subKey] !== null && rank === prMap[subKey]) {
+                    star = `<span class="pr-star">★</span>`;
+                }
+
+                return `
+                    <span class="score-num">${score}</span>
+                    <span class="rank-num">${rank !== null ? rank : '-'}${star}</span>
+                `;
+            };
+
+            tr.innerHTML = `
+                <td>
+                    <div>${d.time}</div>
+                    ${isManageMode ? `
+                        <div class="tbl-manage-group">
+                            <button class="tbl-icon-btn" onclick="openEditModal(${idx})" title="修改">✏️</button>
+                            <button class="tbl-icon-btn del" onclick="deleteExam(${idx})" title="删除">🗑️</button>
+                        </div>
+                    ` : ''}
+                </td>
+                <td>${makeCell('总分')}</td>
+                <td>${makeCell('语文')}</td>
+                <td>${makeCell('数学')}</td>
+                <td>${makeCell('英语')}</td>
+                <td>${makeCell('物理')}</td>
+                <td>${makeCell('化学')}</td>
+                <td>${makeCell('地理')}</td>
+            `;
+            tbody.appendChild(tr);
         });
     }
 
-    window.onload = () => { initChart(); fillTable(); };
+    function switchDimension(dim) {
+        currentDimension = dim;
+        document.querySelectorAll('#dimensionFilterGroup .pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.innerText === dim);
+        });
+        initOrUpdateChart();
+    }
+
+    function applyTimeFilter(range) {
+        currentTimeFilter = range;
+        document.querySelectorAll('#timeFilterGroup .pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.innerText === range);
+        });
+        initOrUpdateChart();
+    }
+
+    function toggleManageMode() {
+        isManageMode = !isManageMode;
+        const btn = document.getElementById('btnManage');
+        btn.classList.toggle('active', isManageMode);
+        btn.innerText = isManageMode ? '✅ 完成管理' : '🛠️ 成绩管理';
+        renderTable();
+    }
+
+    function openAddModal() {
+        document.getElementById('modalTitle').innerText = '➕ 录入新考试成绩';
+        document.getElementById('editIndex').value = '-1';
+        document.getElementById('inputTime').value = '';
+        ['总分', '语文', '数学', '英语', '物理', '化学', '地理'].forEach(s => {
+            document.getElementById(`inputScore_${s}`).value = '';
+            document.getElementById(`inputRank_${s}`).value = '';
+        });
+        document.getElementById('examModal').style.display = 'flex';
+    }
+
+    function openEditModal(index) {
+        const item = examData[index];
+        document.getElementById('modalTitle').innerText = `✏️ 修改考试数据 (${item.time})`;
+        document.getElementById('editIndex').value = index;
+        document.getElementById('inputTime').value = item.time;
+        ['总分', '语文', '数学', '英语', '物理', '化学', '地理'].forEach(s => {
+            const rec = item[s] || [null, null];
+            document.getElementById(`inputScore_${s}`).value = rec[0] !== null ? rec[0] : '';
+            document.getElementById(`inputRank_${s}`).value = rec[1] !== null ? rec[1] : '';
+        });
+        document.getElementById('examModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('examModal').style.display = 'none';
+    }
+
+    function saveExamData() {
+        const timeVal = document.getElementById('inputTime').value.trim();
+        if (!timeVal) {
+            alert('请填写考试日期（如 26.05.15）');
+            return;
+        }
+
+        const collectSub = (s) => {
+            const sVal = document.getElementById(`inputScore_${s}`).value;
+            const rVal = document.getElementById(`inputRank_${s}`).value;
+            const score = sVal !== '' ? parseFloat(sVal) : null;
+            const rank = rVal !== '' ? parseInt(rVal, 10) : null;
+            return [score, rank];
+        };
+
+        const newItem = {
+            time: timeVal,
+            "总分": collectSub('总分'),
+            "语文": collectSub('语文'),
+            "数学": collectSub('数学'),
+            "英语": collectSub('英语'),
+            "物理": collectSub('物理'),
+            "化学": collectSub('化学'),
+            "地理": collectSub('地理')
+        };
+
+        const idx = parseInt(document.getElementById('editIndex').value, 10);
+        if (idx >= 0) {
+            examData[idx] = newItem;
+        } else {
+            examData.push(newItem);
+        }
+
+        persistData();
+        closeModal();
+        renderAll();
+    }
+
+    function deleteExam(index) {
+        const target = examData[index];
+        if (confirm(`确定要删除【${target.time}】的记录吗？`)) {
+            examData.splice(index, 1);
+            persistData();
+            renderAll();
+        }
+    }
+
+    function renderNotes() {
+        const content = currentNotes.trim() ? currentNotes : defaultNotes;
+        document.getElementById('notesContent').innerText = content;
+        document.getElementById('notesUpdateTime').innerText = notesLastUpdated ? `更新于: ${notesLastUpdated}` : '';
+    }
+
+    function toggleEditNotes(show = true) {
+        const viewEl = document.getElementById('notesContent');
+        const editEl = document.getElementById('notesEditArea');
+        const btn = document.getElementById('btnEditNotes');
+
+        if (show && editEl.style.display !== 'block') {
+            if (currentNotes.trim() === defaultNotes || currentNotes.trim() === '') {
+                document.getElementById('notesInput').value = '';
+            } else {
+                document.getElementById('notesInput').value = currentNotes;
+            }
+            viewEl.style.display = 'none';
+            editEl.style.display = 'block';
+            btn.style.display = 'none';
+            document.getElementById('notesInput').focus();
+        } else {
+            viewEl.style.display = 'block';
+            editEl.style.display = 'none';
+            btn.style.display = 'inline-block';
+        }
+    }
+
+    function insertCurrentTimestamp() {
+        const area = document.getElementById('notesInput');
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const stamp = `
+【${y}.${m}.${d} 备注】：
+`;
+        area.value = area.value + stamp;
+        area.focus();
+    }
+
+    function saveNotes() {
+        const text = document.getElementById('notesInput').value.trim();
+        if (!text) {
+            currentNotes = defaultNotes;
+            notesLastUpdated = "";
+        } else {
+            currentNotes = text;
+            const now = new Date();
+            notesLastUpdated = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        }
+        
+        localStorage.setItem('wangzi_notes_content_v8', currentNotes);
+        localStorage.setItem('wangzi_notes_time_v8', notesLastUpdated);
+        
+        toggleEditNotes(false);
+        renderNotes();
+    }
+
+    function saveToLocalHtmlFile() {
+        try {
+            let currentHTML = document.documentElement.outerHTML;
+            
+            const dataJson = JSON.stringify(examData, null, 4);
+            const notesJson = JSON.stringify(currentNotes);
+            
+            currentHTML = currentHTML.replace(
+                /const defaultRawData = \[[\s\S]*?\];/,
+                `const defaultRawData = ${dataJson};`
+            );
+            currentHTML = currentHTML.replace(
+                /const defaultNotes = [\s\S]*?;/,
+                `const defaultNotes = ${notesJson};`
+            );
+
+            const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8' });
+            const now = new Date();
+            const dateTag = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+            const fileName = `王子九悦_成绩成长博物馆_备份_${dateTag}.html`;
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName;
+            
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 1200);
+        } catch (e) {
+            alert('导出备份失败，请在浏览器允许下载权限：' + e.message);
+        }
+    }
+
+    function renderAll() {
+        renderLatestReview();
+        initOrUpdateChart();
+        renderNotes();
+        renderTable();
+    }
+
+    window.onload = () => {
+        initData();
+        renderAll();
+    };
 </script>
 </body>
 </html>
